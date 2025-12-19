@@ -1,0 +1,32 @@
+EEG-Seizure-Detection-JSSC/
+│
+├── 1_feature_extraction/
+│   ├── preprocess.py
+│   ├── bandpass.py
+│   ├── tca_fe.py
+│   └── build_dataset.py
+│
+├── 2_model/
+│   ├── poly_svm.py
+│   ├── sample_weighting.py
+│   └── oversampling.py
+│
+├── 3_post_processing/
+│   ├── event_extraction.py
+│   ├── post_filter.py
+│   └── threshold_tuning.py
+│
+├── 4_training_and_adaptation/
+│   ├── one_shot_train.py
+│   ├── online_tuning.py
+│   └── sequential_loader.py
+│
+├── 5_evaluation_and_analysis/
+│   ├── metrics.py
+│   ├── latency.py
+│   ├── resource_analysis.py
+│   └── visualization.py
+│
+├── README.md
+├── requirements.txt
+└── run_experiment.py

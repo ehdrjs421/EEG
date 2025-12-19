@@ -2,6 +2,7 @@ import mne
 import os
 import glob
 import re
+from EEG import np, pd
 from scipy.signal import butter, lfilter
 from sklearn.preprocessing import StandardScaler
 
@@ -69,7 +70,7 @@ all_patients_labels = []
 all_patients_info = [] # (환자 ID, 파일명, 윈도우 인덱스 등 추적용)
 
 # CHB-MIT 데이터베이스 경로 (사용자 환경에 맞게 수정)
-database_path = '/content/drive/My Drive/chb-mit-scalp-eeg-database-1.0.0/'
+database_path = 'C:/Users/ehdrj/Desktop/학교/졸업프로젝트/뇌전증 매트랩/chb-mit-scalp-eeg-database-1.0.0/'
 patient_dirs = sorted(glob.glob(os.path.join(database_path, 'chb*')))  # chb01 ~ chb24 폴더
 
 EXPECTED_FEATURE_SIZE = None
