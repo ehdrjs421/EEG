@@ -93,8 +93,8 @@ def build_dataset(
             print(edf_path)
             edf_name = os.path.basename(edf_path)
             print(edf_name)
-            if edf_name != 'chb01_01.edf': ############ 나중에 삭제
-                continue
+            if edf_name == 'chb01_08.edf': ############ 나중에 삭제
+                break
 
             # ===============================
             # Load EEG

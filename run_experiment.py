@@ -49,6 +49,7 @@ for patient_id in patient_ids:
     print(f"\n📂 Processing patient: {patient_id}")
 
     X_pat, y_pat, df_info_pat = load_patient_data(RESULT_PATH, patient_id)
+
     if X_pat is None:
         continue
 
@@ -69,8 +70,8 @@ for patient_id in patient_ids:
 # 5. Online Tuning
     svm, y_pred_after = online_tuning(
         svm=svm,
-        X_train_scaled=None,   # 내부에서 재구성
-        y_train=None,
+        X_train_scaled=X_test,   # 내부에서 재구성
+        y_train=y_test,
         X_test_scaled=X_test,
         y_test=y_test,
         decision_scores=decision_scores

@@ -21,7 +21,11 @@ def online_tuning(
 
     if not seizure_idx:
         return svm, None
-
+    
+    if X_train_scaled is None or y_train is None:
+        X_train_scaled = X_test_scaled.reshape(-1, 1)
+        y_train = y_test.copy()
+        
     X_new = X_test_scaled[seizure_idx]
     y_new = y_test[seizure_idx]
 
