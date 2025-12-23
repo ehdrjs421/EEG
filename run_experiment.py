@@ -25,9 +25,10 @@ from evaluation_and_analysis.resource_analysis import analyze_model_resources
 from evaluation_and_analysis.visualization import plot_pca_decision_boundary
 
 # 1. 실험 설정
-BASE_DATA_PATH = r'C:/Users/ehdrj/Desktop/학교/졸업프로젝트/뇌전증 매트랩/chb-mit-scalp-eeg-database-1.0.0'
+if(BASE_DATA_PATH == None):
+    BASE_DATA_PATH = r'C:/Users/ehdrj/Desktop/학교/졸업프로젝트/뇌전증 매트랩/chb-mit-scalp-eeg-database-1.0.0'
 
-RESULT_PATH =  r'C:/Users/ehdrj/Desktop/학교/졸업프로젝트/뇌전증 매트랩/chb-mit-scalp-eeg-database-1.0.0/result'
+    RESULT_PATH =  r'C:/Users/ehdrj/Desktop/학교/졸업프로젝트/뇌전증 매트랩/chb-mit-scalp-eeg-database-1.0.0/result'
 os.makedirs(RESULT_PATH, exist_ok=True)
 
 RANDOM_SEED = 10
