@@ -79,7 +79,7 @@ def build_dataset(
         patient_id = os.path.basename(patient_dir)
         # if patient_id == 'chb05': ############ 나중에 삭제
         #     break
-        if not ('chb05' <= patient_id <= 'chb08'):
+        if not ('chb01' <= patient_id <= 'chb01'):
             continue
         # # 데이터 처리 분리 진행
         print(f"{patient_id}")
@@ -95,6 +95,8 @@ def build_dataset(
         for edf_path in edf_files:
             print(edf_path)
             edf_name = os.path.basename(edf_path)
+            if edf_name != "chb01_01.edf":
+                break
             print(edf_name)
 
             # ===============================
