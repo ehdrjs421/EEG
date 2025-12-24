@@ -79,6 +79,8 @@ def build_dataset(
         patient_id = os.path.basename(patient_dir)
         if patient_id == 'chb05': ############ 나중에 삭제
             break
+        # if not ('chb05' <= patient_id <= 'chb10'):
+        #     continue
         print(f"{patient_id}")
         summary_file1 = os.path.join(edf_root, f"{patient_id}")
         summary_file = os.path.join(summary_file1, f"{patient_id}-summary.txt")

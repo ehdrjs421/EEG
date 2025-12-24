@@ -114,8 +114,17 @@ for patient_id in patient_ids:
     gc.collect()
 
 # 10. 전체 결과 요약
-df_results = pd.DataFrame(results)
-df_results.to_csv(os.path.join(RESULT_PATH, "final_results.csv"), index=False)
+csv_path = os.path.join(RESULT_PATH, "final_result.csv")
+df_new = pd.DataFrame(results)
+
+if os.path.exists(csv_path):
+    df_old = pd.read_csv(csv_path)
+    df_results = pd.concat([df_old, df_new], ignore_index=True)
+    df_results = df_results.drop_duplicates(subset=['patient'], keep='last')
+else:
+    df_results = df_new
+
+df_results.to_csv(csv_path, index=False)
 
 print("\n✅ Experiment completed.")
 print(df_results.mean(numeric_only=True))
