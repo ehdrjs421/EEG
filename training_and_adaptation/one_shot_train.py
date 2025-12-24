@@ -68,7 +68,7 @@ def one_shot_training(
     return {
         'svm': svm,
         'scaler': scaler,
-        'X_train_scaled': X_train_scaled,
+        'X_train_scaled':X_train_scaled,
         'y_train': y_train,
         'X_test': X_test_scaled,
         'y_test': y_test,
