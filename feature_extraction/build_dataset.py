@@ -75,11 +75,12 @@ def build_dataset(
 
     patient_dirs = sorted(glob.glob(os.path.join(edf_root, "chb*")))
 
+    EXPECTED_FEATURE_SIZE = None
     for patient_dir in patient_dirs:
         patient_id = os.path.basename(patient_dir)
         # if patient_id == 'chb05': ############ 나중에 삭제
         #     break
-        if not ('chb12' <= patient_id):
+        if not ('chb13' <= patient_id):
             continue
         # # 데이터 처리 분리 진행
         print(f"{patient_id}")
@@ -124,6 +125,14 @@ def build_dataset(
             )
 
             if features is None:
+                continue
+
+            final_file_features = features
+            
+            if EXPECTED_FEATURE_SIZE is None:
+                EXPECTED_FEATURE_SIZE = final_file_features.shape[1]
+            elif final_file_features.shape[1] != EXPECTED_FEATURE_SIZE:
+                print(f"    ⚠️ Skipping {edf_name}: feature size mismatch. Got {final_file_features.shape[1]}, expected {EXPECTED_FEATURE_SIZE}.")
                 continue
 
             # ===============================
