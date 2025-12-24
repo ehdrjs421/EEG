@@ -117,14 +117,19 @@ for patient_id in patient_ids:
 csv_path = os.path.join(RESULT_PATH, "final_result.csv")
 df_new = pd.DataFrame(results)
 
-if os.path.exists(csv_path):
-    df_old = pd.read_csv(csv_path)
-    df_results = pd.concat([df_old, df_new], ignore_index=True)
-    df_results = df_results.drop_duplicates(subset=['patient'], keep='last')
-else:
-    df_results = df_new
+if not df_new.empty:
+    if os.path.exists(csv_path):
+        df_old = pd.read_csv(csv_path)
+        df_results = pd.concat([df_old, df_new], ignore_index=True)
+        df_results = df_results.drop_duplicates(subset=['patient'], keep='last')
+    else:
+        df_results = df_new
+    
+    df_results['patient_num'] = df_results['patient'].str.extract(r'(\d+)').astype(int)
+    df_results = df_results.sort_values('patient_num').drop(columns='patient_num')
 
-df_results.to_csv(csv_path, index=False)
+    df_results.to_csv(csv_path, index=False)
+
 
 print("\n✅ Experiment completed.")
 print(df_results.mean(numeric_only=True))
