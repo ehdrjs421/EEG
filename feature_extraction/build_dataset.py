@@ -80,8 +80,8 @@ def build_dataset(
         patient_id = os.path.basename(patient_dir)
         # if patient_id == 'chb05': ############ 나중에 삭제
         #     break
-        if not ('chb13' <= patient_id):
-            continue
+        # if not ('chb13' <= patient_id):
+            # continue
         # # 데이터 처리 분리 진행
         print(f"{patient_id}")
         summary_file1 = os.path.join(edf_root, f"{patient_id}")
