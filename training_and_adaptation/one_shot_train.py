@@ -27,6 +27,7 @@ def one_shot_training(
     n_nonseizure_train = n_seizure_train * 5
 
     if len(nonseizure_idx) < n_nonseizure_train:
+        print("skip")
         return None
 
     train_idx = (
@@ -67,6 +68,8 @@ def one_shot_training(
     return {
         'svm': svm,
         'scaler': scaler,
+        'X_train_scaled': X_train_scaled,
+        'y_train': y_train,
         'X_test': X_test_scaled,
         'y_test': y_test,
         'y_pred': y_pred,

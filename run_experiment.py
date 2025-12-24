@@ -67,6 +67,8 @@ for patient_id in patient_ids:
 
     svm = one_shot['svm']
     scaler = one_shot['scaler']
+    X_train_scaled = one_shot['X_train_scaled']
+    y_train = one_shot['y_train']
     X_test = one_shot['X_test']
     y_test = one_shot['y_test']
     y_pred_before = one_shot['y_pred']
@@ -75,8 +77,8 @@ for patient_id in patient_ids:
 # 5. Online Tuning
     svm, y_pred_after = online_tuning(
         svm=svm,
-        X_train_scaled=X_test,   # 내부에서 재구성
-        y_train=y_test,
+        X_train_scaled=X_train_scaled,   # 내부에서 재구성
+        y_train=y_train,
         X_test_scaled=X_test,
         y_test=y_test,
         decision_scores=decision_scores
