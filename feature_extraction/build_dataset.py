@@ -95,8 +95,8 @@ def build_dataset(
         for edf_path in edf_files:
             print(edf_path)
             edf_name = os.path.basename(edf_path)
-            if edf_name != "chb01_01.edf":
-                break
+            if not ('chb01_01.edf' <= edf_name <= 'chb01_10.edf'):
+                continue
             print(edf_name)
 
             # ===============================
