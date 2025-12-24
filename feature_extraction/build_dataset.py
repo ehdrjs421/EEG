@@ -77,8 +77,7 @@ def build_dataset(
 
     for patient_dir in patient_dirs:
         patient_id = os.path.basename(patient_dir)
-        if patient_id != 'chb01': ############ 나중에 삭제
-            continue
+
         print(f"{patient_id}")
         summary_file1 = os.path.join(edf_root, f"{patient_id}")
         summary_file = os.path.join(summary_file1, f"{patient_id}-summary.txt")
@@ -93,8 +92,6 @@ def build_dataset(
             print(edf_path)
             edf_name = os.path.basename(edf_path)
             print(edf_name)
-            if edf_name == 'chb01_08.edf': ############ 나중에 삭제
-                break
 
             # ===============================
             # Load EEG
