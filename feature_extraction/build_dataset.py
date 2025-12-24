@@ -79,7 +79,7 @@ def build_dataset(
         patient_id = os.path.basename(patient_dir)
         # if patient_id == 'chb05': ############ 나중에 삭제
         #     break
-        if not ('chb01' <= patient_id <= 'chb04'):
+        if not ('chb09' <= patient_id <= 'chb12'):
             continue
         # # 데이터 처리 분리 진행
         print(f"{patient_id}")
