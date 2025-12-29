@@ -78,8 +78,8 @@ def build_dataset(
     EXPECTED_FEATURE_SIZE = None
     for patient_dir in patient_dirs:
         patient_id = os.path.basename(patient_dir)
-        # if patient_id == 'chb05': ############ 나중에 삭제
-        #     break
+        if patient_id == 'chb02': ############ 나중에 삭제
+            break
         # if not ('chb13' <= patient_id):
             # continue
         # # 데이터 처리 분리 진행
