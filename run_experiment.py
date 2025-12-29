@@ -23,7 +23,7 @@ from training_and_adaptation.online_tuning import online_tuning
 from evaluation_and_analysis.metrics import compute_basic_metrics, evaluate_vector_based_detection
 from evaluation_and_analysis.latency import compute_latency_in_event, compute_latency_per_event
 from evaluation_and_analysis.resource_analysis import analyze_model_resources
-from evaluation_and_analysis.visualization import plot_pca_decision_boundary
+from evaluation_and_analysis.visualization import plot_polysvm_decision_boundary
 
 # 1. 실험 설정
 
