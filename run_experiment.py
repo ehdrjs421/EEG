@@ -85,7 +85,21 @@ for patient_id in patient_ids:
     )
 
     y_pred = y_pred_after if y_pred_after is not None else y_pred_before
+    pred_df = pd.DataFrame({
+        "time_idx": np.arange(len(y_test)),
+        "y_true": y_test,
+        "y_pred_before": y_pred_before,
+        "y_pred_after": y_pred_after if y_pred_after is not None else y_pred_before,
+        "decision_score": decision_scores,
+        "patient": patient_id
+    })
 
+    pred_path = os.path.join(
+    RESULT_PATH,
+    f"pred_sequence_{patient_id}.csv"
+    )
+    pred_df.to_csv(pred_path, index=False)
+    
 # 6. Evaluation
     metrics = compute_basic_metrics(y_test, y_pred)
     vec_sens = evaluate_vector_based_detection(y_test, y_pred, threshold=0.9)
