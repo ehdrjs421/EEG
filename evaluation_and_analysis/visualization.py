@@ -3,43 +3,87 @@ import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 
 
-def plot_pca_decision_boundary(
-    X_train,
-    y_train,
-    X_test,
-    y_test,
-    svm
+def plot_polysvm_decision_boundary(
+    X,
+    y,
+    svm_model,
+    save_path=None,
+    use_pca=True,
+    grid_resolution=300
 ):
-    pca = PCA(n_components=2)
-    X_train_pca = pca.fit_transform(X_train)
-    X_test_pca = pca.transform(X_test)
+    # 1. Dimensionality reduction
+    if use_pca:
+        pca = PCA(n_components=2)
+        X_vis = pca.fit_transform(X)
+    else:
+        if X.shape[1] != 2:
+            raise ValueError("X must be 2D if use_pca=False")
+        X_vis = X
 
-    x_min, x_max = X_train_pca[:, 0].min() - 1, X_train_pca[:, 0].max() + 1
-    y_min, y_max = X_train_pca[:, 1].min() - 1, X_train_pca[:, 1].max() + 1
+    # 2. Prepare grid
+    x_min, x_max = X_vis[:, 0].min() - 1, X_vis[:, 0].max() + 1
+    y_min, y_max = X_vis[:, 1].min() - 1, X_vis[:, 1].max() + 1
 
     xx, yy = np.meshgrid(
-        np.linspace(x_min, x_max, 300),
-        np.linspace(y_min, y_max, 300)
+        np.linspace(x_min, x_max, grid_resolution),
+        np.linspace(y_min, y_max, grid_resolution)
     )
 
     grid = np.c_[xx.ravel(), yy.ravel()]
-    Z = svm.decision_function(
-        pca.inverse_transform(grid)
-    ).reshape(xx.shape)
 
-    plt.figure(figsize=(10, 6))
-    plt.contour(xx, yy, Z, levels=[0], colors='black', linewidths=3)
-    plt.scatter(
-        X_test_pca[y_test == 0, 0],
-        X_test_pca[y_test == 0, 1],
-        c='white', edgecolor='k', label='Non-Seizure'
+    # NOTE: decision_function expects original feature space
+    if use_pca:
+        grid_original = pca.inverse_transform(grid)
+    else:
+        grid_original = grid
+
+    Z = svm_model.decision_function(grid_original)
+    Z = Z.reshape(xx.shape)
+
+    # 3. Plot
+    plt.figure(figsize=(8, 6))
+
+    markers = {0: 'o', 1: 's'}
+    labels = {0: 'Non-seizure', 1: 'Seizure'}
+
+    for cls in np.unique(y):
+        idx = np.where(y == cls)
+        plt.scatter(
+            X_vis[idx, 0],
+            X_vis[idx, 1],
+            marker=markers[cls],
+            edgecolors='k',
+            facecolors='none',
+            label=labels[cls]
+        )
+
+    # Support vectors
+    if hasattr(svm_model, "X"):
+        sv = svm_model.X
+        sv_vis = pca.transform(sv) if use_pca else sv
+        plt.scatter(
+            sv_vis[:, 0],
+            sv_vis[:, 1],
+            s=150,
+            facecolors='none',
+            edgecolors='k',
+            linewidths=1.2,
+            label='Support Vectors'
+        )
+
+    plt.contour(
+        xx, yy, Z,
+        levels=[-1, 0, 1],
+        linestyles=['--', '-', '--'],
+        colors='k'
     )
-    plt.scatter(
-        X_test_pca[y_test == 1, 0],
-        X_test_pca[y_test == 1, 1],
-        c='blue', edgecolor='k', label='Seizure'
-    )
+
+    plt.title("PolySVM Decision Boundary (2D Projection)")
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
+
+    if save_path is not None:
+        plt.savefig(save_path, dpi=300)
+
     plt.show()

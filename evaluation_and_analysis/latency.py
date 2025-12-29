@@ -38,3 +38,14 @@ def compute_latency_per_event(y_true, y_pred, step_sec=1):
             latencies.append(None)
 
     return latencies
+
+# def compute_event_coverage(y_true, y_pred):
+#     events = extract_seizure_events(y_true)
+#     coverages = []
+
+#     for start, end in events:
+#         gt_len = end - start + 1
+#         detected = np.sum(y_pred[start:end+1] == 1)
+#         coverages.append(detected / gt_len)
+
+#     return coverages
