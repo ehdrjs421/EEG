@@ -50,13 +50,23 @@ MERGE_SCORE_THRESHOLD = 0.0   # gap 구간 score 평균 기준 (SVM 결정 경�
 STEP_SEC              = 1     # 타임스텝 = 1초 (build_dataset STEP_LEN_SEC 기준)
 FALLBACK_GAP_SEC      = 30    # chosen_event가 없을 때 사용할 기본값
  
-# # 2. Feature Extraction
-# print("🔧 Feature extraction started...")
-# X, y, df_info = build_dataset(BASE_DATA_PATH,RESULT_PATH)
-# print("✅ Feature extraction completed.")
-
-# patient_ids = sorted(df_info['patient'].unique())
-
+# 2. Feature Extraction
+existing_files = [
+    f for f in os.listdir(RESULT_PATH)
+    if f.startswith("X_chb") and f.endswith(".npy")
+]
+ 
+if existing_files:
+    print("✅ 전처리된 데이터 발견 — Feature extraction 스킵")
+    patient_ids = sorted([
+        f.replace("X_", "").replace(".npy", "") for f in existing_files
+    ])
+else:
+    print("🔧 Feature extraction started...")
+    X, y, df_info = build_dataset(BASE_DATA_PATH, RESULT_PATH)
+    print("✅ Feature extraction completed.")
+    patient_ids = sorted(df_info['patient'].unique())
+ 
 results = []
 results_before = []
 
