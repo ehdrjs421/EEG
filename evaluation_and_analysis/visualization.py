@@ -99,13 +99,13 @@ def plot_prediction_timeline(
     s_min, s_max = scores.min(), scores.max()
     scores_norm = (scores - s_min) / (s_max - s_min + 1e-8)
 
-    fig, axes = plt.subplots(4, 1, figsize=(20, 6), sharex=True)
+    fig, axes = plt.subplots(4, 1, figsize=(16, 6), sharex=True)
     fig.suptitle(f"Prediction Timeline — {patient_id}", fontsize=13, fontweight='bold')
 
     rows = [
         (y_true,   'y_true',          '#2ecc71', '#27ae60'),
         (y_before, 'Before',    '#3498db', '#2980b9'),
-        (y_after, 'After',    '#3498db', '#2980b9'),
+        # (y_after, 'After',    '#3498db', '#2980b9'),
         (y_merged, 'After Merge ✨',  '#e74c3c', '#c0392b'),
     ]
 
