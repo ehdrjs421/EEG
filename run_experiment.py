@@ -157,13 +157,20 @@ for patient_id in patient_ids:
     )
     pred_df.to_csv(pred_path, index=False)
     
-# 6. Evaluation
-    metrics = compute_basic_metrics(y_test, y_pred)
-    vec_sens = evaluate_vector_based_detection(y_test, y_pred, threshold=0.9)
-    latency = compute_latency_in_event(y_test, y_pred)
-    latencies = compute_latency_per_event(y_test, y_pred)
-
-# 7. Resource Analysis
+# 7. Evaluation — merge 전/후 비교
+    metrics_before = compute_basic_metrics(y_test, y_pred)
+    metrics_merged = compute_basic_metrics(y_test, y_pred_merged)
+ 
+    vec_sens_before = evaluate_vector_based_detection(y_test, y_pred,        threshold=0.9)
+    vec_sens_merged = evaluate_vector_based_detection(y_test, y_pred_merged, threshold=0.9)
+ 
+    latency_before   = compute_latency_in_event(y_test, y_pred)
+    latency_merged   = compute_latency_in_event(y_test, y_pred_merged)
+ 
+    latencies_before = compute_latency_per_event(y_test, y_pred)
+    latencies_merged = compute_latency_per_event(y_test, y_pred_merged)
+ 
+    # 8. Resource Analysis
     resource = analyze_model_resources(
         model=svm,
         X_test=X_test,
@@ -179,6 +186,7 @@ for patient_id in patient_ids:
     #     'vec_sens_60': vec_sens,
     #     **resource
     # })
+    # 9. 결과 저장
     results.append({
         'patient'          : patient_id,
         # 기존 메트릭 (merge 전)
@@ -198,11 +206,11 @@ for patient_id in patient_ids:
         **resource
     })
 
-# 9. 메모리 정리
+# 10. 메모리 정리
     del X_pat, y_pat, df_info_pat
     gc.collect()
 
-# 10. 전체 결과 요약
+# 11. 전체 결과 요약
 csv_path = os.path.join(RESULT_PATH, "final_result.csv")
 df_new = pd.DataFrame(results)
 
