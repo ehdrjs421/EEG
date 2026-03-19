@@ -15,7 +15,7 @@ def load_and_preprocess_edf(
         print(f"    ❌ Error loading {edf_path}: {e}")
         return None, None    
     
-    raw = mne.io.read_raw_edf(edf_path, preload=True, verbose=False)
+    # raw = mne.io.read_raw_edf(edf_path, preload=True, verbose=False)
 
     # 채널명 정리
     raw.rename_channels(lambda s: s.strip().replace('.', ''))

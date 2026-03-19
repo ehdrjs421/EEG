@@ -39,12 +39,12 @@ RANDOM_SEED = 10
 random.seed(RANDOM_SEED)
 np.random.seed(RANDOM_SEED)
 
-# 2. Feature Extraction
-print("🔧 Feature extraction started...")
-X, y, df_info = build_dataset(BASE_DATA_PATH,RESULT_PATH)
-print("✅ Feature extraction completed.")
+# # 2. Feature Extraction
+# print("🔧 Feature extraction started...")
+# X, y, df_info = build_dataset(BASE_DATA_PATH,RESULT_PATH)
+# print("✅ Feature extraction completed.")
 
-patient_ids = sorted(df_info['patient'].unique())
+# patient_ids = sorted(df_info['patient'].unique())
 
 results = []
 results_before = []
