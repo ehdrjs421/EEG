@@ -162,8 +162,8 @@ for patient_id in patient_ids:
     metrics_before = compute_basic_metrics(y_test, y_pred)
     metrics_merged = compute_basic_metrics(y_test, y_pred_merged)
  
-    vec_sens_before = evaluate_vector_based_detection(y_test, y_pred,        threshold=0.9)
-    vec_sens_merged = evaluate_vector_based_detection(y_test, y_pred_merged, threshold=0.9)
+    vec_sens_before = evaluate_vector_based_detection(y_test, y_pred,        threshold=0.8)
+    vec_sens_merged = evaluate_vector_based_detection(y_test, y_pred_merged, threshold=0.8)
  
     latency_before   = compute_latency_in_event(y_test, y_pred)
     latency_merged   = compute_latency_in_event(y_test, y_pred_merged)
