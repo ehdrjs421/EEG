@@ -189,21 +189,32 @@ for patient_id in patient_ids:
     # })
     # 9. 결과 저장
     results.append({
-        'patient'          : patient_id,
+        'patient'            : patient_id,
         # 기존 메트릭 (merge 전)
         **{f"{k}_before": v for k, v in metrics_before.items()},
-        'latency_before'   : latency_before,
-        'vec_sens_before'  : vec_sens_before,
-        # ✨ 덩어리화 후 메트릭
+        'latency_before'     : latency_before,
+        'vec_sens_before'    : vec_sens_before,
+        # ✨ FA 지표 (merge 전)
+        'n_fa_before'        : fa_before['n_fa'],
+        'fa_per_hour_before' : fa_before['fa_per_hour'],
+        'n_true_events'      : fa_before['n_true_events'],
+        'n_pred_events_before': fa_before['n_pred_events'],
+        'event_sens_before'  : fa_before['event_sensitivity'],
+        # 덩어리화 후 메트릭
         **{f"{k}_merged": v for k, v in metrics_merged.items()},
-        'latency_merged'   : latency_merged,
-        'vec_sens_merged'  : vec_sens_merged,
-        # ✨ 병합 통계 (환자별 adaptive gap 추적)
-        'init_max_gap'     : round(init_max_gap, 2),
-        'adaptive_max_gap' : round(adaptive_max_gap, 2),
-        'n_merges'         : merge_summary['n_merges'],
-        'mean_gap_len_sec' : merge_summary['mean_gap_len_sec'],
-        'mean_gap_score'   : merge_summary['mean_gap_score'],
+        'latency_merged'     : latency_merged,
+        'vec_sens_merged'    : vec_sens_merged,
+        # ✨ FA 지표 (merge 후)
+        'n_fa_merged'        : fa_merged['n_fa'],
+        'fa_per_hour_merged' : fa_merged['fa_per_hour'],
+        'n_pred_events_merged': fa_merged['n_pred_events'],
+        'event_sens_merged'  : fa_merged['event_sensitivity'],
+        # 병합 통계
+        'init_max_gap'       : round(init_max_gap, 2),
+        'adaptive_max_gap'   : round(adaptive_max_gap, 2),
+        'n_merges'           : merge_summary['n_merges'],
+        'mean_gap_len_sec'   : merge_summary['mean_gap_len_sec'],
+        'mean_gap_score'     : merge_summary['mean_gap_score'],
         **resource
     })
 
