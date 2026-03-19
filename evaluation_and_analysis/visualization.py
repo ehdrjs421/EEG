@@ -90,7 +90,7 @@ def plot_prediction_timeline(
 
     t = df['time_idx'].values
     y_true   = df['y_true'].values
-    y_before = df['y_pred_after'].values
+    y_before = df['y_pred_before'].values
     y_after = df['y_pred_after'].values
     y_merged = df['y_pred_merged'].values
     scores   = df['decision_score'].values
@@ -104,8 +104,8 @@ def plot_prediction_timeline(
 
     rows = [
         (y_true,   'y_true',          '#2ecc71', '#27ae60'),
-        (y_before, 'Before Merge',    '#3498db', '#2980b9'),
-        (y_after, 'After Merge',    '#3498db', '#2980b9'),
+        (y_before, 'Before',    '#3498db', '#2980b9'),
+        (y_after, 'After',    '#3498db', '#2980b9'),
         (y_merged, 'After Merge ✨',  '#e74c3c', '#c0392b'),
     ]
 
