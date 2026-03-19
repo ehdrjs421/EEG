@@ -91,6 +91,7 @@ def plot_prediction_timeline(
     t = df['time_idx'].values
     y_true   = df['y_true'].values
     y_before = df['y_pred_after'].values
+    y_after = df['y_pred_after'].values
     y_merged = df['y_pred_merged'].values
     scores   = df['decision_score'].values
 
@@ -98,7 +99,7 @@ def plot_prediction_timeline(
     s_min, s_max = scores.min(), scores.max()
     scores_norm = (scores - s_min) / (s_max - s_min + 1e-8)
 
-    fig, axes = plt.subplots(3, 1, figsize=(16, 6), sharex=True)
+    fig, axes = plt.subplots(4, 1, figsize=(16, 6), sharex=True)
     fig.suptitle(f"Prediction Timeline — {patient_id}", fontsize=13, fontweight='bold')
 
     rows = [
