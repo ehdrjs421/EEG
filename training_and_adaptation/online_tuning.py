@@ -39,7 +39,7 @@ def online_tuning(
 
     scores = svm.decision_function(X_test_scaled)
     y_pred = apply_post_filter(
-        (scores > 2.0).astype(int),
+        (scores > 1.5).astype(int),
         min_consec=4
     )
 
