@@ -152,7 +152,7 @@ def plot_event_comparison(
     from post_processing.event_extraction import extract_seizure_events
 
     y_true   = pred_df['y_true'].values
-    y_before = pred_df['y_pred_after'].values
+    y_before = pred_df['y_pred_before'].values
     y_merged = pred_df['y_pred_merged'].values
     T        = len(y_true)
 
@@ -166,7 +166,7 @@ def plot_event_comparison(
     # 레이어별 y 위치
     layers = [
         (events_true,   2.0, '#2ecc71', 'y_true'),
-        (events_before, 1.0, '#3498db', 'Before Merge'),
+        (events_before, 1.0, '#3498db', 'Before'),
         (events_merged, 0.0, '#e74c3c', 'After Merge ✨'),
     ]
 
