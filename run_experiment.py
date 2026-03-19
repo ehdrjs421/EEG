@@ -147,6 +147,7 @@ for patient_id in patient_ids:
         "y_true": y_test,
         "y_pred_before": y_pred_before,
         "y_pred_after": y_pred_after if y_pred_after is not None else y_pred_before,
+        "y_pred_merged"  : y_pred_merged,
         "decision_score": decision_scores,
         "patient": patient_id
     })
