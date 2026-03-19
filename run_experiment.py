@@ -25,6 +25,12 @@ from evaluation_and_analysis.latency import compute_latency_in_event, compute_la
 from evaluation_and_analysis.resource_analysis import analyze_model_resources
 from evaluation_and_analysis.visualization import plot_polysvm_decision_boundary
 
+from post_processing.seizure_merge import (
+    estimate_max_gap_from_one_shot,
+    estimate_max_gap_from_pred,
+    merge_seizure_events,
+    summarize_merge_log
+)
 # 1. 실험 설정
 
 BASE_DATA_PATH ="/content/drive/MyDrive/chb-mit-scalp-eeg-database-1.0.0"
@@ -39,6 +45,11 @@ RANDOM_SEED = 10
 random.seed(RANDOM_SEED)
 np.random.seed(RANDOM_SEED)
 
+MERGE_GAP_RATIO       = 0.5   # 발작 지속시간 대비 max_gap 비율
+MERGE_SCORE_THRESHOLD = 0.0   # gap 구간 score 평균 기준 (SVM 결정 경계)
+STEP_SEC              = 1     # 타임스텝 = 1초 (build_dataset STEP_LEN_SEC 기준)
+FALLBACK_GAP_SEC      = 30    # chosen_event가 없을 때 사용할 기본값
+ 
 # # 2. Feature Extraction
 # print("🔧 Feature extraction started...")
 # X, y, df_info = build_dataset(BASE_DATA_PATH,RESULT_PATH)
@@ -73,7 +84,17 @@ for patient_id in patient_ids:
     y_test = one_shot['y_test']
     y_pred_before = one_shot['y_pred']
     decision_scores = one_shot['decision_scores']
+    chosen_event    = one_shot['chosen_event']
 
+    init_max_gap = estimate_max_gap_from_one_shot(
+        chosen_event,
+        ratio=MERGE_GAP_RATIO,
+        step_sec=STEP_SEC,
+        fallback_sec=FALLBACK_GAP_SEC
+    )
+    print(f"  📏 Init max_gap: {init_max_gap:.1f}s "
+          f"(chosen_event duration: {(chosen_event[1]-chosen_event[0])*STEP_SEC}s)")
+ 
 # 5. Online Tuning
     svm, y_pred_after = online_tuning(
         svm=svm,
@@ -85,6 +106,32 @@ for patient_id in patient_ids:
     )
 
     y_pred = y_pred_after if y_pred_after is not None else y_pred_before
+
+    final_scores     = svm.decision_function(X_test)
+    adaptive_max_gap = estimate_max_gap_from_pred(
+        y_pred,
+        ratio=MERGE_GAP_RATIO,
+        step_sec=STEP_SEC,
+        fallback_sec=init_max_gap
+    )
+    print(f"  📏 Adaptive max_gap: {adaptive_max_gap:.1f}s "
+          f"(updated from y_pred median duration)")
+ 
+    # ✨ 6. Seizure Merge (덩어리화)
+    y_pred_merged, merged_events, merge_log = merge_seizure_events(
+        y_pred=y_pred,
+        decision_scores=final_scores,
+        max_gap_sec=adaptive_max_gap,
+        score_threshold=MERGE_SCORE_THRESHOLD,
+        step_sec=STEP_SEC
+    )
+    merge_summary = summarize_merge_log(merge_log, used_max_gap=adaptive_max_gap)
+ 
+    print(f"  🔗 Merge | "
+          f"events: {len(merged_events)} | "
+          f"n_merges: {merge_summary['n_merges']} | "
+          f"mean_gap: {merge_summary['mean_gap_len_sec']}s")
+ 
     pred_df = pd.DataFrame({
         "time_idx": np.arange(len(y_test)),
         "y_true": y_test,
@@ -114,12 +161,30 @@ for patient_id in patient_ids:
     )
 
 # 8. 결과 저장
+    # results.append({
+    #     'patient': patient_id,
+    #     **metrics,
+    #     'latency': latency,
+    #     'latencies': latencies,
+    #     'vec_sens_60': vec_sens,
+    #     **resource
+    # })
     results.append({
-        'patient': patient_id,
-        **metrics,
-        'latency': latency,
-        'latencies': latencies,
-        'vec_sens_60': vec_sens,
+        'patient'          : patient_id,
+        # 기존 메트릭 (merge 전)
+        **{f"{k}_before": v for k, v in metrics_before.items()},
+        'latency_before'   : latency_before,
+        'vec_sens_before'  : vec_sens_before,
+        # ✨ 덩어리화 후 메트릭
+        **{f"{k}_merged": v for k, v in metrics_merged.items()},
+        'latency_merged'   : latency_merged,
+        'vec_sens_merged'  : vec_sens_merged,
+        # ✨ 병합 통계 (환자별 adaptive gap 추적)
+        'init_max_gap'     : round(init_max_gap, 2),
+        'adaptive_max_gap' : round(adaptive_max_gap, 2),
+        'n_merges'         : merge_summary['n_merges'],
+        'mean_gap_len_sec' : merge_summary['mean_gap_len_sec'],
+        'mean_gap_score'   : merge_summary['mean_gap_score'],
         **resource
     })
 

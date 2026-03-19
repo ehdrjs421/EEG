@@ -7,6 +7,7 @@ from model.poly_svm import PolySVM
 from model.oversampling import oversample_seizure
 from post_processing.event_extraction import extract_seizure_events
 from post_processing.post_filter import apply_post_filter
+from post_processing.seizure_merge import estimate_max_gap_from_one_shot
 from training_and_adaptation.sampling import stratified_time_sampling
 
 def one_shot_training(
@@ -65,6 +66,13 @@ def one_shot_training(
         y_test, y_pred, output_dict=True, zero_division=0
     )
 
+    initial_max_gap = estimate_max_gap_from_one_shot(
+        chosen_event=chosen_event,
+        ratio=0.5,
+        step_sec=1,
+        fallback_sec=30
+    )
+
     return {
         'svm': svm,
         'scaler': scaler,
@@ -75,5 +83,7 @@ def one_shot_training(
         'y_pred': y_pred,
         'y_pred_raw': y_pred_raw,
         'decision_scores': decision_scores,
-        'report': report
+        'report': report,
+        'chosen_event'   : chosen_event,    # ✨ 선택된 발작 이벤트
+        'initial_max_gap': initial_max_gap  # ✨ one_shot 기반 초기 max_gap
     }
