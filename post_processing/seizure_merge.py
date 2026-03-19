@@ -60,7 +60,7 @@ def estimate_max_gap_from_pred(y_pred, ratio=0.5, step_sec=1, fallback_sec=30):
     durations = [(end - start) * step_sec for start, end in events]
     median_duration = float(np.median(durations))
 
-    return float(max(median_duration * ratio, 5.0))
+    return float(max(median_duration * ratio, fallback_sec * 0.5))
 
 
 def merge_seizure_events(
