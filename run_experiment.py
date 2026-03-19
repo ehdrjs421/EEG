@@ -170,6 +170,9 @@ for patient_id in patient_ids:
  
     latencies_before = compute_latency_per_event(y_test, y_pred)
     latencies_merged = compute_latency_per_event(y_test, y_pred_merged)
+
+    fa_before = compute_false_alarms(y_test, y_pred,        step_sec=STEP_SEC)
+    fa_merged = compute_false_alarms(y_test, y_pred_merged, step_sec=STEP_SEC)
  
     # 8. Resource Analysis
     resource = analyze_model_resources(
