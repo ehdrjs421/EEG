@@ -105,6 +105,7 @@ def plot_prediction_timeline(
     rows = [
         (y_true,   'y_true',          '#2ecc71', '#27ae60'),
         (y_before, 'Before Merge',    '#3498db', '#2980b9'),
+        (y_after, 'After Merge',    '#3498db', '#2980b9'),
         (y_merged, 'After Merge ✨',  '#e74c3c', '#c0392b'),
     ]
 
