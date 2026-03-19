@@ -20,7 +20,7 @@ from training_and_adaptation.online_tuning import online_tuning
 # ===============================
 # Evaluation & Analysis
 # ===============================
-from evaluation_and_analysis.metrics import compute_basic_metrics, evaluate_vector_based_detection, compute_false_alarms
+from evaluation_and_analysis.metrics import compute_basic_metrics, evaluate_vector_based_detection, compute_false_alarms, evaluate_early_detection
 from evaluation_and_analysis.latency import compute_latency_in_event, compute_latency_per_event
 from evaluation_and_analysis.resource_analysis import analyze_model_resources
 from evaluation_and_analysis.visualization import plot_polysvm_decision_boundary
@@ -173,6 +173,15 @@ for patient_id in patient_ids:
 
     fa_before = compute_false_alarms(y_test, y_pred,        step_sec=STEP_SEC)
     fa_merged = compute_false_alarms(y_test, y_pred_merged, step_sec=STEP_SEC)
+    
+        # ✨ Early Detection 계산 (30초/60초 기준, merge 전/후)
+    early30_before  = evaluate_early_detection(y_test, y_pred,        latency_threshold_sec=30,  step_sec=STEP_SEC)
+    early30_merged  = evaluate_early_detection(y_test, y_pred_merged, latency_threshold_sec=30,  step_sec=STEP_SEC)
+    early60_before  = evaluate_early_detection(y_test, y_pred,        latency_threshold_sec=60,  step_sec=STEP_SEC)
+    early60_merged  = evaluate_early_detection(y_test, y_pred_merged, latency_threshold_sec=60,  step_sec=STEP_SEC)
+ 
+    print(f"  Early Det | 30s: {early30_before:.3f}->{early30_merged:.3f} | "
+          f"60s: {early60_before:.3f}->{early60_merged:.3f}")
  
     # 8. Resource Analysis
     resource = analyze_model_resources(
@@ -203,6 +212,21 @@ for patient_id in patient_ids:
         'n_true_events'      : fa_before['n_true_events'],
         'n_pred_events_before': fa_before['n_pred_events'],
         'event_sens_before'  : fa_before['event_sensitivity'],
+        # ✨ Early Detection (merge 전)
+        'early30_before'      : early30_before,
+        'early60_before'      : early60_before,
+        # 덩어리화 후 메트릭
+        **{f"{k}_merged": v for k, v in metrics_merged.items()},
+        'latency_merged'      : latency_merged,
+        'vec_sens_merged'     : vec_sens_merged,
+        # ✨ FA 지표 (merge 후)
+        'n_fa_merged'         : fa_merged['n_fa'],
+        'fa_per_hour_merged'  : fa_merged['fa_per_hour'],
+        'n_pred_events_merged': fa_merged['n_pred_events'],
+        'event_sens_merged'   : fa_merged['event_sensitivity'],
+        # ✨ Early Detection (merge 후)
+        'early30_merged'      : early30_merged,
+        'early60_merged'      : early60_merged,
         # 덩어리화 후 메트릭
         **{f"{k}_merged": v for k, v in metrics_merged.items()},
         'latency_merged'     : latency_merged,

@@ -30,6 +30,38 @@ def evaluate_vector_based_detection(y_true, y_pred, threshold=0.6):
 
     return detected / len(events)
 
+# ✨ Early Detection 함수 추가
+def evaluate_early_detection(y_true, y_pred, latency_threshold_sec=30, step_sec=1):
+    """
+    발작 시작 후 N초 이내에 감지하면 성공으로 판정합니다.
+    임상적으로 가장 의미있는 event-wise 지표예요.
+ 
+    Parameters
+    ----------
+    y_true : np.ndarray
+    y_pred : np.ndarray
+    latency_threshold_sec : int
+        감지 허용 시간 (초), 기본값 30초
+    step_sec : int
+        타임스텝당 초
+ 
+    Returns
+    -------
+    float : 조기 감지율 (0~1)
+    """
+    events = extract_seizure_events(y_true)
+    if not events:
+        return None
+ 
+    detected = 0
+    for start, end in events:
+        window_end = min(start + latency_threshold_sec // step_sec, end)
+        if np.sum(y_pred[start:window_end + 1]) > 0:
+            detected += 1
+ 
+    return round(detected / len(events), 4)
+ 
+ 
 def compute_false_alarms(y_true, y_pred, recording_hours=None, step_sec=1):
     """
     이벤트 단위 False Alarm을 계산합니다.
