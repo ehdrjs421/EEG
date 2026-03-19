@@ -197,7 +197,7 @@ def plot_event_comparison(
     # 범례
     patches = [
         mpatches.Patch(color='#2ecc71', label='y_true'),
-        mpatches.Patch(color='#3498db', label='Before Merge'),
+        mpatches.Patch(color='#3498db', label='Before'),
         mpatches.Patch(color='#e74c3c', label='After Merge'),
         mpatches.Patch(color='#f39c12', hatch='//', label='Merged Gap'),
     ]
