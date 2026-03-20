@@ -37,6 +37,11 @@ def one_shot_training(
             nonseizure_idx, len(y), n_nonseizure_train
         )
     )
+    # exclude = set()
+    # for idx in train_idx:
+    #     exclude.update(range(idx - GAP, idx + GAP + 1))
+
+    # test_idx = sorted(set(range(len(y))) - set(train_idx) - exclude)
     test_idx = sorted(set(range(len(y))) - set(train_idx))
 
     X_train, y_train = X[train_idx], y[train_idx]

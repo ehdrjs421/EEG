@@ -2,7 +2,7 @@ import random
 import numpy as np
 from model.oversampling import oversample_seizure
 from post_processing.post_filter import apply_post_filter
-
+from post_processing.two_stage_filter import apply_two_stage_filter  # ✨
 
 def online_tuning(
     svm,
@@ -38,9 +38,17 @@ def online_tuning(
     svm.prune_support_vectors(threshold=1e-3)
 
     scores = svm.decision_function(X_test_scaled)
-    y_pred = apply_post_filter(
-        (scores > 0.4).astype(int),
-        min_consec=8
+   
+    y_pred, _, _ = apply_two_stage_filter(
+        decision_scores=scores,
+        alert_threshold=0.2,
+        alert_min_consec=4,
+        confirm_threshold=0.4,
+        confirm_min_consec=8
     )
+    # y_pred = apply_post_filter(
+    #     (scores > 0.4).astype(int),
+    #     min_consec=8
+    # )
 
     return svm, y_pred
