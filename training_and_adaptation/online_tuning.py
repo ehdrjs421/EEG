@@ -2,7 +2,7 @@ import random
 import numpy as np
 from model.oversampling import oversample_seizure
 from post_processing.post_filter import apply_post_filter
-from post_processing.two_stage_filter import apply_two_stage_filter  # ✨
+
 
 def online_tuning(
     svm,
@@ -11,7 +11,8 @@ def online_tuning(
     X_test_scaled,
     y_test,
     decision_scores,
-    max_seizure_samples=30
+    max_seizure_samples=30,
+    adaptive_min_consec=8   # ✨ one_shot에서 계산한 값 전달
 ):
     high_conf_idx = np.where(np.abs(decision_scores) > 0.8)[0]
     seizure_idx = [i for i in high_conf_idx if y_test[i] == 1]
@@ -21,11 +22,11 @@ def online_tuning(
 
     if not seizure_idx:
         return svm, None
-    
+
     if X_train_scaled is None or y_train is None:
         X_train_scaled = X_test_scaled.reshape(-1, 1)
         y_train = y_test.copy()
-        
+
     X_new = X_test_scaled[seizure_idx]
     y_new = y_test[seizure_idx]
 
@@ -38,17 +39,13 @@ def online_tuning(
     svm.prune_support_vectors(threshold=1e-3)
 
     scores = svm.decision_function(X_test_scaled)
-   
-    y_pred, _, _ = apply_two_stage_filter(
-        decision_scores=scores,
-        alert_threshold=0.2,
-        alert_min_consec=6,
-        confirm_threshold=0.4,
-        confirm_min_consec=8
+
+    # ✨ Adaptive min_consec 적용
+    # chosen_event 지속시간 기반으로 one_shot에서 계산한 값 사용
+    # < 20초 → min_consec=4, 20~40초 → min_consec=6, > 40초 → min_consec=8
+    y_pred = apply_post_filter(
+        (scores > 0.4).astype(int),
+        min_consec=adaptive_min_consec
     )
-    # y_pred = apply_post_filter(
-    #     (scores > 0.4).astype(int),
-    #     min_consec=8
-    # )
 
     return svm, y_pred
