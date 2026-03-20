@@ -1,116 +1,51 @@
 import random
 import numpy as np
-from sklearn.preprocessing import MinMaxScaler
-from sklearn.metrics import classification_report
-
-from model.poly_svm import PolySVM
 from model.oversampling import oversample_seizure
-from post_processing.event_extraction import extract_seizure_events
 from post_processing.post_filter import apply_post_filter
-from post_processing.seizure_merge import estimate_max_gap_from_one_shot
-from post_processing.context_filter import compute_context_threshold  # ✨
-from training_and_adaptation.sampling import stratified_time_sampling
 
 
-def one_shot_training(
-    X, y, df_info,
-    random_state=10
+def online_tuning(
+    svm,
+    X_train_scaled,
+    y_train,
+    X_test_scaled,
+    y_test,
+    decision_scores,
+    max_seizure_samples=30,
+    adaptive_min_consec=8
 ):
-    random.seed(random_state)
+    high_conf_idx = np.where(np.abs(decision_scores) > 0.8)[0]
+    seizure_idx = [i for i in high_conf_idx if y_test[i] == 1]
 
-    seizure_events = extract_seizure_events(y)
-    if not seizure_events:
-        return None
+    if len(seizure_idx) > max_seizure_samples:
+        seizure_idx = random.sample(seizure_idx, max_seizure_samples)
 
-    chosen_event = random.choice(seizure_events)
-    seizure_idx = list(range(chosen_event[0], chosen_event[1]))
-    nonseizure_idx = df_info[df_info['label'] == 0].index.tolist()
+    if not seizure_idx:
+        return svm, None
 
-    n_seizure_train = max(1, min(10, int(len(seizure_idx) * 0.5)))
-    n_nonseizure_train = n_seizure_train * 5
+    if X_train_scaled is None or y_train is None:
+        X_train_scaled = X_test_scaled.reshape(-1, 1)
+        y_train = y_test.copy()
 
-    if len(nonseizure_idx) < n_nonseizure_train:
-        print("skip")
-        return None
+    X_new = X_test_scaled[seizure_idx]
+    y_new = y_test[seizure_idx]
 
-    train_idx = (
-        random.sample(seizure_idx, n_seizure_train) +
-        stratified_time_sampling(
-            nonseizure_idx, len(y), n_nonseizure_train
-        )
-    )
+    X_aug = np.vstack([X_train_scaled, X_new])
+    y_aug = np.concatenate([y_train, y_new])
 
-    # Gap 추가 — train 샘플 인접 window를 test에서 제외
-    GAP = 2
-    exclude = set()
-    for idx in train_idx:
-        exclude.update(range(idx - GAP, idx + GAP + 1))
+    X_aug_os, y_aug_os = oversample_seizure(X_aug, y_aug, ratio=3)
 
-    test_idx = sorted(set(range(len(y))) - set(train_idx) - exclude)
-
-    X_train, y_train = X[train_idx], y[train_idx]
-    X_test,  y_test  = X[test_idx],  y[test_idx]
-
-    scaler = MinMaxScaler()
-    X_train_scaled = scaler.fit_transform(X_train)
-    X_test_scaled  = scaler.transform(X_test)
-
-    X_train_os, y_train_os = oversample_seizure(
-        X_train_scaled, y_train, ratio=3
-    )
-
-    svm = PolySVM(
-        degree=2, coef0=1, C=10.0, gamma=0.5,
-        lr=0.001, n_iters=1000,
-        loss_weight=True, pos_weight=15.0
-    )
-    svm.fit(X_train_os, y_train_os)
+    svm.fit(X_aug_os, y_aug_os)
     svm.prune_support_vectors(threshold=1e-3)
 
-    decision_scores = svm.decision_function(X_test_scaled)
-    y_pred_raw = (decision_scores > 0.2).astype(int)
-    y_pred     = apply_post_filter(y_pred_raw, min_consec=3)
+    scores = svm.decision_function(X_test_scaled)
 
-    report = classification_report(
-        y_test, y_pred, output_dict=True, zero_division=0
+    # min_consec=8 고정 (기존 최선값)
+    # FA와 미감지 발작의 score 분포가 겹쳐서
+    # threshold/min_consec 조정만으로는 동시 해결 불가
+    y_pred = apply_post_filter(
+        (scores > 0.4).astype(int),
+        min_consec=8
     )
 
-    # ✨ 전체 시퀀스 score 계산 (chosen_event 직전 패턴 추출용)
-    all_scores = svm.decision_function(scaler.transform(X))
-
-    # ✨ one_shot 기반 초기 max_gap
-    initial_max_gap = estimate_max_gap_from_one_shot(
-        chosen_event=chosen_event,
-        ratio=0.5,
-        step_sec=1,
-        fallback_sec=30
-    )
-
-    # ✨ one_shot 기반 초기 context_threshold (patient-specific)
-    # chosen_event 직전 패턴(TP) vs train non-seizure score(FA) 비교
-    non_seizure_train_scores = all_scores[
-        [i for i in train_idx if y[i] == 0]
-    ]
-    initial_context_threshold = compute_context_threshold(
-        scores=all_scores,
-        tp_event=chosen_event,
-        non_seizure_scores=non_seizure_train_scores,
-        context_sec=10,
-        step_sec=1
-    )
-
-    return {
-        'svm'                       : svm,
-        'scaler'                    : scaler,
-        'X_train_scaled'            : X_train_scaled,
-        'y_train'                   : y_train,
-        'X_test'                    : X_test_scaled,
-        'y_test'                    : y_test,
-        'y_pred'                    : y_pred,
-        'y_pred_raw'                : y_pred_raw,
-        'decision_scores'           : decision_scores,
-        'report'                    : report,
-        'chosen_event'              : chosen_event,
-        'initial_max_gap'           : initial_max_gap,
-        'initial_context_threshold' : initial_context_threshold,  # ✨
-    }
+    return svm, y_pred
