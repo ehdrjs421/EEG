@@ -42,7 +42,7 @@ def online_tuning(
     y_pred, _, _ = apply_two_stage_filter(
         decision_scores=scores,
         alert_threshold=0.2,
-        alert_min_consec=4,
+        alert_min_consec=6,
         confirm_threshold=0.4,
         confirm_min_consec=8
     )
