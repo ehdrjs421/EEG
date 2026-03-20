@@ -1,4 +1,7 @@
+import numpy as np
 import mne
+
+AMPLITUDE_THRESHOLD_UV = 500 
 
 def load_and_preprocess_edf(
     edf_path,
@@ -32,4 +35,29 @@ def load_and_preprocess_edf(
     # 리샘플링
     raw.resample(target_sfreq, verbose=False)
 
-    return raw.get_data(), raw.info['sfreq']
+    # ✨ 진폭 임계값 기반 아티팩트 제거
+    # V → μV 변환 후 임계값 적용
+    data_uv = data * 1e6
+ 
+    # 임계값 초과 구간을 채널 평균으로 대체
+    # (0으로 채우면 발작 신호 경계에서 왜곡 발생 가능)
+    artifact_mask = np.abs(data_uv) > AMPLITUDE_THRESHOLD_UV
+    n_artifact = artifact_mask.sum()
+ 
+    if n_artifact > 0:
+        for ch_idx in range(data_uv.shape[0]):
+            ch_mask = artifact_mask[ch_idx]
+            if ch_mask.any():
+                ch_mean = data_uv[ch_idx, ~ch_mask].mean() if (~ch_mask).any() else 0.0
+                data_uv[ch_idx, ch_mask] = ch_mean
+ 
+        artifact_ratio = n_artifact / data_uv.size
+        if artifact_ratio > 0.01:  # 1% 이상이면 경고
+            print(f"    ⚠️ Artifact detected: {n_artifact} samples "
+                  f"({artifact_ratio*100:.2f}%) replaced")
+ 
+    # μV → V 복원
+    data_clean = data_uv / 1e6
+ 
+    return data_clean, raw.info['sfreq']
+    # return raw.get_data(), raw.info['sfreq']
