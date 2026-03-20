@@ -34,7 +34,7 @@ def load_and_preprocess_edf(
 
     # 리샘플링
     raw.resample(target_sfreq, verbose=False)
-
+    data = raw.get_data()
     # ✨ 진폭 임계값 기반 아티팩트 제거
     # V → μV 변환 후 임계값 적용
     data_uv = data * 1e6
