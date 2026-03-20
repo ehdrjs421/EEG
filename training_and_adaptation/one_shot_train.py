@@ -1,14 +1,16 @@
 import random
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
-from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.metrics import classification_report
 
 from model.poly_svm import PolySVM
 from model.oversampling import oversample_seizure
 from post_processing.event_extraction import extract_seizure_events
 from post_processing.post_filter import apply_post_filter
-from post_processing.seizure_merge import estimate_max_gap_from_one_shot  # ✨
+from post_processing.seizure_merge import estimate_max_gap_from_one_shot
+from post_processing.context_filter import compute_context_threshold  # ✨
 from training_and_adaptation.sampling import stratified_time_sampling
+
 
 def one_shot_training(
     X, y, df_info,
@@ -38,9 +40,7 @@ def one_shot_training(
         )
     )
 
-    # ✨ Gap 추가 — train 샘플 인접 window를 test에서 제외
-    # window=2초, step=1초 → 인접 2칸이 겹침 → gap=2로 완전 독립 보장
-    # 제외되는 window: train 샘플당 최대 4개 → 전체의 0.1% 미만으로 영향 미미
+    # Gap 추가 — train 샘플 인접 window를 test에서 제외
     GAP = 2
     exclude = set()
     for idx in train_idx:
@@ -49,11 +49,11 @@ def one_shot_training(
     test_idx = sorted(set(range(len(y))) - set(train_idx) - exclude)
 
     X_train, y_train = X[train_idx], y[train_idx]
-    X_test, y_test = X[test_idx], y[test_idx]
+    X_test,  y_test  = X[test_idx],  y[test_idx]
 
     scaler = MinMaxScaler()
     X_train_scaled = scaler.fit_transform(X_train)
-    X_test_scaled = scaler.transform(X_test)
+    X_test_scaled  = scaler.transform(X_test)
 
     X_train_os, y_train_os = oversample_seizure(
         X_train_scaled, y_train, ratio=3
@@ -69,13 +69,16 @@ def one_shot_training(
 
     decision_scores = svm.decision_function(X_test_scaled)
     y_pred_raw = (decision_scores > 0.2).astype(int)
-    y_pred = apply_post_filter(y_pred_raw, min_consec=3)
+    y_pred     = apply_post_filter(y_pred_raw, min_consec=3)
 
     report = classification_report(
         y_test, y_pred, output_dict=True, zero_division=0
     )
 
-    # ✨ chosen_event 기반 초기 max_gap 추정
+    # ✨ 전체 시퀀스 score 계산 (chosen_event 직전 패턴 추출용)
+    all_scores = svm.decision_function(scaler.transform(X))
+
+    # ✨ one_shot 기반 초기 max_gap
     initial_max_gap = estimate_max_gap_from_one_shot(
         chosen_event=chosen_event,
         ratio=0.5,
@@ -83,29 +86,31 @@ def one_shot_training(
         fallback_sec=30
     )
 
-    # ✨ chosen_event 지속시간 기반 adaptive min_consec
-    # 미감지 발작 분석 결과: 짧은 발작(~13초)은 min_consec=8에 걸려서 미감지
-    # → 발작이 짧은 환자는 min_consec을 낮춰서 포착
-    chosen_duration = (chosen_event[1] - chosen_event[0])
-    if chosen_duration < 20:
-        adaptive_min_consec = 4   # 짧은 발작 환자
-    elif chosen_duration < 40:
-        adaptive_min_consec = 6   # 중간 발작 환자
-    else:
-        adaptive_min_consec = 8   # 긴 발작 환자 (기존과 동일)
+    # ✨ one_shot 기반 초기 context_threshold (patient-specific)
+    # chosen_event 직전 패턴(TP) vs train non-seizure score(FA) 비교
+    non_seizure_train_scores = all_scores[
+        [i for i in train_idx if y[i] == 0]
+    ]
+    initial_context_threshold = compute_context_threshold(
+        scores=all_scores,
+        tp_event=chosen_event,
+        non_seizure_scores=non_seizure_train_scores,
+        context_sec=10,
+        step_sec=1
+    )
 
     return {
-        'svm'                 : svm,
-        'scaler'              : scaler,
-        'X_train_scaled'      : X_train_scaled,
-        'y_train'             : y_train,
-        'X_test'              : X_test_scaled,
-        'y_test'              : y_test,
-        'y_pred'              : y_pred,
-        'y_pred_raw'          : y_pred_raw,
-        'decision_scores'     : decision_scores,
-        'report'              : report,
-        'chosen_event'        : chosen_event,
-        'initial_max_gap'     : initial_max_gap,
-        'adaptive_min_consec' : adaptive_min_consec   # ✨
+        'svm'                       : svm,
+        'scaler'                    : scaler,
+        'X_train_scaled'            : X_train_scaled,
+        'y_train'                   : y_train,
+        'X_test'                    : X_test_scaled,
+        'y_test'                    : y_test,
+        'y_pred'                    : y_pred,
+        'y_pred_raw'                : y_pred_raw,
+        'decision_scores'           : decision_scores,
+        'report'                    : report,
+        'chosen_event'              : chosen_event,
+        'initial_max_gap'           : initial_max_gap,
+        'initial_context_threshold' : initial_context_threshold,  # ✨
     }

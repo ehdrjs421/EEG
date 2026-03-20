@@ -33,6 +33,12 @@ from post_processing.seizure_merge import (
     summarize_merge_log
 )
 
+# ✨ Context Filter (patient-specific FA 제거)
+from post_processing.context_filter import (
+    update_context_threshold,
+    apply_context_filter
+)
+
 # ===============================
 # 1. 실험 설정
 # ===============================
@@ -48,7 +54,7 @@ np.random.seed(RANDOM_SEED)
 
 # ✨ 덩어리화 공통 파라미터
 MERGE_GAP_RATIO       = 0.5   # 발작 지속시간 대비 max_gap 비율
-MERGE_SCORE_THRESHOLD = -1   # gap 구간 score 평균 기준 (SVM 결정 경계)
+MERGE_SCORE_THRESHOLD = 0.0   # gap 구간 score 평균 기준 (SVM 결정 경계)
 STEP_SEC              = 1     # 타임스텝 = 1초 (build_dataset STEP_LEN_SEC 기준)
 FALLBACK_GAP_SEC      = 30    # chosen_event가 없을 때 사용할 기본값
 
@@ -100,16 +106,13 @@ for patient_id in patient_ids:
     y_pred_before   = one_shot['y_pred']
     decision_scores = one_shot['decision_scores']
     chosen_event    = one_shot['chosen_event']
+    init_max_gap    = one_shot['initial_max_gap']
+    # ✨ one_shot 기반 초기 context threshold
+    context_threshold = one_shot['initial_context_threshold']
 
-    # ✨ 1단계: one_shot chosen_event 지속시간으로 초기 max_gap 설정
-    init_max_gap = estimate_max_gap_from_one_shot(
-        chosen_event,
-        ratio=MERGE_GAP_RATIO,
-        step_sec=STEP_SEC,
-        fallback_sec=FALLBACK_GAP_SEC
-    )
     print(f"  chosen_event 지속시간: {(chosen_event[1]-chosen_event[0])*STEP_SEC}초 "
-          f"→ init_max_gap={init_max_gap:.1f}s")
+          f"→ init_max_gap={init_max_gap:.1f}s | "
+          f"ctx_threshold={context_threshold['pre_mean_threshold']:.3f}")
 
     # 5. Online Tuning
     svm, y_pred_after = online_tuning(
@@ -123,9 +126,7 @@ for patient_id in patient_ids:
 
     y_pred = y_pred_after if y_pred_after is not None else y_pred_before
 
-    # ✨ 2단계: online tuning 이후 y_pred 통계로 max_gap 갱신
-    #    y_true 없이 예측 결과만으로 환자 특성에 적응
-    #    발작이 전혀 없으면 1단계 init_max_gap을 fallback으로 유지
+    # ✨ 2단계: online tuning 이후 max_gap 갱신
     final_scores     = svm.decision_function(X_test)
     adaptive_max_gap = estimate_max_gap_from_pred(
         y_pred,
@@ -133,8 +134,19 @@ for patient_id in patient_ids:
         step_sec=STEP_SEC,
         fallback_sec=init_max_gap
     )
-    print(f"  📏 Adaptive max_gap: {adaptive_max_gap:.1f}s "
-          f"(updated from y_pred median duration)")
+
+    # ✨ 2단계: online tuning 이후 context_threshold 갱신
+    context_threshold = update_context_threshold(
+        scores=final_scores,
+        y_pred=y_pred,
+        current_threshold=context_threshold,
+        context_sec=10,
+        step_sec=STEP_SEC,
+        high_conf=0.8,
+        alpha=0.3
+    )
+    print(f"  ctx_threshold 갱신 → pre_mean={context_threshold['pre_mean_threshold']:.3f} | "
+          f"slope={context_threshold['slope_threshold']:.3f}")
 
     # ✨ 6. Seizure Merge (덩어리화)
     y_pred_merged, merged_events, merge_log = merge_seizure_events(
@@ -146,96 +158,124 @@ for patient_id in patient_ids:
     )
     merge_summary = summarize_merge_log(merge_log, used_max_gap=adaptive_max_gap)
 
+    # ✨ 7. Context Filter (patient-specific FA 제거)
+    y_pred_filtered, filter_log = apply_context_filter(
+        y_pred=y_pred_merged,
+        scores=final_scores,
+        context_threshold=context_threshold,
+        context_sec=10,
+        step_sec=STEP_SEC
+    )
+    n_filtered = sum(1 for f in filter_log if f['removed'])
+    print(f"  Context Filter | 제거된 이벤트: {n_filtered}개")
+
     print(f"  🔗 Merge | "
           f"events: {len(merged_events)} | "
           f"n_merges: {merge_summary['n_merges']} | "
           f"mean_gap: {merge_summary['mean_gap_len_sec']}s")
 
-    # 예측 시퀀스 저장 (merge 전/후 모두 기록)
+    # 예측 시퀀스 저장
     pred_df = pd.DataFrame({
-        "time_idx"       : np.arange(len(y_test)),
-        "y_true"         : y_test,
-        "y_pred_before"  : y_pred_before,
-        "y_pred_after"   : y_pred_after if y_pred_after is not None else y_pred_before,
-        "y_pred_merged"  : y_pred_merged,
-        "decision_score" : final_scores,
-        "patient"        : patient_id
+        "time_idx"        : np.arange(len(y_test)),
+        "y_true"          : y_test,
+        "y_pred_before"   : y_pred_before,
+        "y_pred_after"    : y_pred_after if y_pred_after is not None else y_pred_before,
+        "y_pred_merged"   : y_pred_merged,
+        "y_pred_filtered" : y_pred_filtered,   # ✨ context filter 결과
+        "decision_score"  : final_scores,
+        "patient"         : patient_id
     })
 
     pred_path = os.path.join(RESULT_PATH, f"pred_sequence_{patient_id}.csv")
     pred_df.to_csv(pred_path, index=False)
 
-    # 7. Evaluation — merge 전/후 비교
-    metrics_before = compute_basic_metrics(y_test, y_pred)
-    metrics_merged = compute_basic_metrics(y_test, y_pred_merged)
+    # 8. Evaluation — before / merged / filtered 비교
+    metrics_before   = compute_basic_metrics(y_test, y_pred)
+    metrics_merged   = compute_basic_metrics(y_test, y_pred_merged)
+    metrics_filtered = compute_basic_metrics(y_test, y_pred_filtered)  # ✨
 
-    vec_sens_before = evaluate_vector_based_detection(y_test, y_pred,        threshold=0.9)
-    vec_sens_merged = evaluate_vector_based_detection(y_test, y_pred_merged, threshold=0.9)
+    vec_sens_before   = evaluate_vector_based_detection(y_test, y_pred,          threshold=0.9)
+    vec_sens_merged   = evaluate_vector_based_detection(y_test, y_pred_merged,   threshold=0.9)
+    vec_sens_filtered = evaluate_vector_based_detection(y_test, y_pred_filtered, threshold=0.9)  # ✨
 
     latency_before   = compute_latency_in_event(y_test, y_pred)
     latency_merged   = compute_latency_in_event(y_test, y_pred_merged)
+    latency_filtered = compute_latency_in_event(y_test, y_pred_filtered)  # ✨
 
-    latencies_before = compute_latency_per_event(y_test, y_pred)
-    latencies_merged = compute_latency_per_event(y_test, y_pred_merged)
+    latencies_before   = compute_latency_per_event(y_test, y_pred)
+    latencies_merged   = compute_latency_per_event(y_test, y_pred_merged)
+    latencies_filtered = compute_latency_per_event(y_test, y_pred_filtered)  # ✨
 
-    # ✨ False Alarm 계산 (merge 전/후)
-    fa_before = compute_false_alarms(y_test, y_pred,        step_sec=STEP_SEC)
-    fa_merged = compute_false_alarms(y_test, y_pred_merged, step_sec=STEP_SEC)
+    # ✨ False Alarm 계산 (before / merged / filtered)
+    fa_before   = compute_false_alarms(y_test, y_pred,          step_sec=STEP_SEC)
+    fa_merged   = compute_false_alarms(y_test, y_pred_merged,   step_sec=STEP_SEC)
+    fa_filtered = compute_false_alarms(y_test, y_pred_filtered, step_sec=STEP_SEC)  # ✨
 
-    print(f"  FA | before: {fa_before['n_fa']}건 ({fa_before['fa_per_hour']:.2f}/h) "
-          f"-> merged: {fa_merged['n_fa']}건 ({fa_merged['fa_per_hour']:.2f}/h) | "
-          f"event_sens: {fa_before['event_sensitivity']:.3f} -> {fa_merged['event_sensitivity']:.3f}")
+    print(f"  FA | before: {fa_before['fa_per_hour']:.2f}/h "
+          f"-> merged: {fa_merged['fa_per_hour']:.2f}/h "
+          f"-> filtered: {fa_filtered['fa_per_hour']:.2f}/h")
 
-    # ✨ Early Detection 계산 (30초/60초 기준, merge 전/후)
-    early30_before  = evaluate_early_detection(y_test, y_pred,        latency_threshold_sec=30,  step_sec=STEP_SEC)
-    early30_merged  = evaluate_early_detection(y_test, y_pred_merged, latency_threshold_sec=30,  step_sec=STEP_SEC)
-    early60_before  = evaluate_early_detection(y_test, y_pred,        latency_threshold_sec=60,  step_sec=STEP_SEC)
-    early60_merged  = evaluate_early_detection(y_test, y_pred_merged, latency_threshold_sec=60,  step_sec=STEP_SEC)
+    # ✨ Early Detection (before / merged / filtered)
+    early30_before   = evaluate_early_detection(y_test, y_pred,          latency_threshold_sec=30, step_sec=STEP_SEC)
+    early30_merged   = evaluate_early_detection(y_test, y_pred_merged,   latency_threshold_sec=30, step_sec=STEP_SEC)
+    early30_filtered = evaluate_early_detection(y_test, y_pred_filtered, latency_threshold_sec=30, step_sec=STEP_SEC)  # ✨
+    early60_before   = evaluate_early_detection(y_test, y_pred,          latency_threshold_sec=60, step_sec=STEP_SEC)
+    early60_merged   = evaluate_early_detection(y_test, y_pred_merged,   latency_threshold_sec=60, step_sec=STEP_SEC)
+    early60_filtered = evaluate_early_detection(y_test, y_pred_filtered, latency_threshold_sec=60, step_sec=STEP_SEC)  # ✨
 
-    print(f"  Early Det | 30s: {early30_before:.3f}->{early30_merged:.3f} | "
-          f"60s: {early60_before:.3f}->{early60_merged:.3f}")
+    print(f"  Early Det | 30s: {early30_before:.3f}->{early30_merged:.3f}->{early30_filtered:.3f} | "
+          f"60s: {early60_before:.3f}->{early60_merged:.3f}->{early60_filtered:.3f}")
 
-    # 8. Resource Analysis
+    # 9. Resource Analysis
     resource = analyze_model_resources(
         model=svm,
         X_test=X_test,
         save_path=os.path.join(RESULT_PATH, f"svm_{patient_id}.joblib")
     )
 
-    # 9. 결과 저장
+    # 10. 결과 저장
     results.append({
-        'patient'            : patient_id,
-        # 기존 메트릭 (merge 전)
+        'patient'              : patient_id,
+        # before
         **{f"{k}_before": v for k, v in metrics_before.items()},
-        'latency_before'     : latency_before,
-        'vec_sens_before'    : vec_sens_before,
-        # ✨ FA 지표 (merge 전)
-        'n_fa_before'         : fa_before['n_fa'],
-        'fa_per_hour_before'  : fa_before['fa_per_hour'],
-        'n_true_events'       : fa_before['n_true_events'],
-        'n_pred_events_before': fa_before['n_pred_events'],
-        'event_sens_before'   : fa_before['event_sensitivity'],
-        # ✨ Early Detection (merge 전)
-        'early30_before'      : early30_before,
-        'early60_before'      : early60_before,
-        # 덩어리화 후 메트릭
+        'latency_before'       : latency_before,
+        'vec_sens_before'      : vec_sens_before,
+        'n_fa_before'          : fa_before['n_fa'],
+        'fa_per_hour_before'   : fa_before['fa_per_hour'],
+        'n_true_events'        : fa_before['n_true_events'],
+        'n_pred_events_before' : fa_before['n_pred_events'],
+        'event_sens_before'    : fa_before['event_sensitivity'],
+        'early30_before'       : early30_before,
+        'early60_before'       : early60_before,
+        # merged
         **{f"{k}_merged": v for k, v in metrics_merged.items()},
-        'latency_merged'      : latency_merged,
-        'vec_sens_merged'     : vec_sens_merged,
-        # ✨ FA 지표 (merge 후)
-        'n_fa_merged'         : fa_merged['n_fa'],
-        'fa_per_hour_merged'  : fa_merged['fa_per_hour'],
-        'n_pred_events_merged': fa_merged['n_pred_events'],
-        'event_sens_merged'   : fa_merged['event_sensitivity'],
-        # ✨ Early Detection (merge 후)
-        'early30_merged'      : early30_merged,
-        'early60_merged'      : early60_merged,
+        'latency_merged'       : latency_merged,
+        'vec_sens_merged'      : vec_sens_merged,
+        'n_fa_merged'          : fa_merged['n_fa'],
+        'fa_per_hour_merged'   : fa_merged['fa_per_hour'],
+        'n_pred_events_merged' : fa_merged['n_pred_events'],
+        'event_sens_merged'    : fa_merged['event_sensitivity'],
+        'early30_merged'       : early30_merged,
+        'early60_merged'       : early60_merged,
+        # ✨ filtered
+        **{f"{k}_filtered": v for k, v in metrics_filtered.items()},
+        'latency_filtered'      : latency_filtered,
+        'vec_sens_filtered'     : vec_sens_filtered,
+        'n_fa_filtered'         : fa_filtered['n_fa'],
+        'fa_per_hour_filtered'  : fa_filtered['fa_per_hour'],
+        'n_pred_events_filtered': fa_filtered['n_pred_events'],
+        'event_sens_filtered'   : fa_filtered['event_sensitivity'],
+        'early30_filtered'      : early30_filtered,
+        'early60_filtered'      : early60_filtered,
+        # context threshold
+        'ctx_pre_mean_thr'      : context_threshold['pre_mean_threshold'],
+        'ctx_slope_thr'         : context_threshold['slope_threshold'],
         # 병합 통계
-        'init_max_gap'        : round(init_max_gap, 2),
-        'adaptive_max_gap'    : round(adaptive_max_gap, 2),
-        'n_merges'            : merge_summary['n_merges'],
-        'mean_gap_len_sec'   : merge_summary['mean_gap_len_sec'],
-        'mean_gap_score'     : merge_summary['mean_gap_score'],
+        'init_max_gap'          : round(init_max_gap, 2),
+        'adaptive_max_gap'      : round(adaptive_max_gap, 2),
+        'n_merges'              : merge_summary['n_merges'],
+        'mean_gap_len_sec'      : merge_summary['mean_gap_len_sec'],
+        'mean_gap_score'        : merge_summary['mean_gap_score'],
         **resource
     })
 
