@@ -100,10 +100,8 @@ for patient_id in patient_ids:
     y_pred_before   = one_shot['y_pred']
     decision_scores = one_shot['decision_scores']
     chosen_event    = one_shot['chosen_event']
-    adaptive_min_consec = one_shot['adaptive_min_consec']   # ✨
 
     # ✨ 1단계: one_shot chosen_event 지속시간으로 초기 max_gap 설정
-    #    y_true를 합법적으로 알 수 있는 유일한 시점(학습용 발작 샘플) 활용
     init_max_gap = estimate_max_gap_from_one_shot(
         chosen_event,
         ratio=MERGE_GAP_RATIO,
@@ -111,7 +109,7 @@ for patient_id in patient_ids:
         fallback_sec=FALLBACK_GAP_SEC
     )
     print(f"  chosen_event 지속시간: {(chosen_event[1]-chosen_event[0])*STEP_SEC}초 "
-          f"→ adaptive_min_consec={adaptive_min_consec}, init_max_gap={init_max_gap:.1f}s")
+          f"→ init_max_gap={init_max_gap:.1f}s")
 
     # 5. Online Tuning
     svm, y_pred_after = online_tuning(
@@ -120,8 +118,7 @@ for patient_id in patient_ids:
         y_train=y_train,
         X_test_scaled=X_test,
         y_test=y_test,
-        decision_scores=decision_scores,
-        adaptive_min_consec=adaptive_min_consec   # ✨
+        decision_scores=decision_scores
     )
 
     y_pred = y_pred_after if y_pred_after is not None else y_pred_before
@@ -236,7 +233,6 @@ for patient_id in patient_ids:
         # 병합 통계
         'init_max_gap'        : round(init_max_gap, 2),
         'adaptive_max_gap'    : round(adaptive_max_gap, 2),
-        'adaptive_min_consec' : adaptive_min_consec,   # ✨
         'n_merges'            : merge_summary['n_merges'],
         'mean_gap_len_sec'   : merge_summary['mean_gap_len_sec'],
         'mean_gap_score'     : merge_summary['mean_gap_score'],
