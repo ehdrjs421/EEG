@@ -12,7 +12,7 @@ def online_tuning(
     y_test,
     decision_scores,
     max_seizure_samples=30,
-    adaptive_min_consec=8   # ✨ one_shot에서 계산한 값 전달
+    adaptive_min_consec=8
 ):
     high_conf_idx = np.where(np.abs(decision_scores) > 0.8)[0]
     seizure_idx = [i for i in high_conf_idx if y_test[i] == 1]
@@ -40,12 +40,12 @@ def online_tuning(
 
     scores = svm.decision_function(X_test_scaled)
 
-    # ✨ Adaptive min_consec 적용
-    # chosen_event 지속시간 기반으로 one_shot에서 계산한 값 사용
-    # < 20초 → min_consec=4, 20~40초 → min_consec=6, > 40초 → min_consec=8
+    # min_consec=8 고정 (기존 최선값)
+    # FA와 미감지 발작의 score 분포가 겹쳐서
+    # threshold/min_consec 조정만으로는 동시 해결 불가
     y_pred = apply_post_filter(
         (scores > 0.4).astype(int),
-        min_consec=adaptive_min_consec
+        min_consec=8
     )
 
     return svm, y_pred
