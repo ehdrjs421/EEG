@@ -202,17 +202,23 @@ def apply_context_filter(
         pre_mean = float(np.mean(pre_scores))
         slope    = float(np.polyfit(range(len(pre_scores)), pre_scores, 1)[0])
 
-        # FA 판정: 두 조건 모두 만족해야 제거 (엄격하게)
+        # 조건 1: 이벤트 자체 score가 높으면 고확신 발작 → 무조건 유지
+        event_score_mean = float(np.mean(scores[p_start:p_end + 1]))
+        if event_score_mean >= 1.0:
+            continue
+
+        # 조건 2: FA 판정 (pre_mean AND slope 둘 다 만족해야 제거)
         is_fa = (pre_mean > pre_mean_thr) and (slope < slope_thr)
 
         if is_fa:
             y_filtered[p_start:p_end + 1] = 0
             filter_log.append({
-                'event_start' : p_start,
-                'event_end'   : p_end,
-                'pre_mean'    : round(pre_mean, 4),
-                'slope'       : round(slope, 4),
-                'removed'     : True
+                'event_start'      : p_start,
+                'event_end'        : p_end,
+                'pre_mean'         : round(pre_mean, 4),
+                'slope'            : round(slope, 4),
+                'event_score_mean' : round(event_score_mean, 4),
+                'removed'          : True
             })
 
     return y_filtered, filter_log
