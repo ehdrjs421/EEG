@@ -12,7 +12,8 @@ def online_tuning(
     y_test,
     decision_scores,
     max_seizure_samples=30,
-    adaptive_min_consec=8
+    adaptive_min_consec=8,
+    max_train_samples=300   # ✨ Forgetting Factor — 최대 train 샘플 수
 ):
     high_conf_idx = np.where(np.abs(decision_scores) > 0.8)[0]
     seizure_idx   = [i for i in high_conf_idx if y_test[i] == 1]
@@ -32,6 +33,13 @@ def online_tuning(
 
     X_aug = np.vstack([X_train_scaled, X_new])
     y_aug = np.concatenate([y_train, y_new])
+
+    # ✨ Forgetting Factor
+    # SoC 메모리 한계 대응: max_train_samples 초과 시 오래된 데이터 제거
+    # 최신 데이터 우선 유지 (뒤에서부터 max_train_samples개)
+    if len(X_aug) > max_train_samples:
+        X_aug = X_aug[-max_train_samples:]
+        y_aug = y_aug[-max_train_samples:]
 
     X_aug_os, y_aug_os = oversample_seizure(X_aug, y_aug, ratio=3)
 
