@@ -20,7 +20,7 @@ from training_and_adaptation.online_tuning import online_tuning
 # ===============================
 # Evaluation & Analysis
 # ===============================
-from evaluation_and_analysis.metrics import compute_basic_metrics, evaluate_vector_based_detection, compute_false_alarms, evaluate_early_detection
+from evaluation_and_analysis.metrics import compute_basic_metrics, evaluate_vector_based_detection, compute_false_alarms, evaluate_early_detection, compute_detection_latency
 from evaluation_and_analysis.latency import compute_latency_in_event, compute_latency_per_event
 from evaluation_and_analysis.resource_analysis import analyze_model_resources
 from evaluation_and_analysis.visualization import plot_polysvm_decision_boundary
@@ -199,13 +199,15 @@ for patient_id in patient_ids:
     vec_sens_merged   = evaluate_vector_based_detection(y_test, y_pred_merged,   threshold=0.9)
     vec_sens_filtered = evaluate_vector_based_detection(y_test, y_pred_filtered, threshold=0.9)  # ✨
 
-    latency_before   = compute_latency_in_event(y_test, y_pred)
-    latency_merged   = compute_latency_in_event(y_test, y_pred_merged)
-    latency_filtered = compute_latency_in_event(y_test, y_pred_filtered)  # ✨
+    # ✨ Event-level Latency (감지된 발작만, 중앙값 기준)
+    lat_before   = compute_detection_latency(y_test, y_pred,          step_sec=STEP_SEC)
+    lat_merged   = compute_detection_latency(y_test, y_pred_merged,   step_sec=STEP_SEC)
+    lat_filtered = compute_detection_latency(y_test, y_pred_filtered, step_sec=STEP_SEC)
 
-    latencies_before   = compute_latency_per_event(y_test, y_pred)
-    latencies_merged   = compute_latency_per_event(y_test, y_pred_merged)
-    latencies_filtered = compute_latency_per_event(y_test, y_pred_filtered)  # ✨
+    print(f"  Latency(median) | before: {lat_before['median_sec']}s "
+          f"-> merged: {lat_merged['median_sec']}s "
+          f"-> filtered: {lat_filtered['median_sec']}s "
+          f"| detected: {lat_before['n_detected']}/{lat_before['n_total']}")
 
     # ✨ False Alarm 계산 (before / merged / filtered)
     fa_before   = compute_false_alarms(y_test, y_pred,          step_sec=STEP_SEC)
@@ -241,7 +243,8 @@ for patient_id in patient_ids:
         'sensitivity_before'   : metrics_before['sensitivity'],
         'specificity_before'   : metrics_before['specificity'],
         'f1_seizure_before'    : metrics_before['f1_seizure'],
-        'latency_before'       : latency_before,
+        'latency_median_before': lat_before['median_sec'],
+        'latency_mean_before'  : lat_before['mean_sec'],
         'vec_sens_before'      : vec_sens_before,
         'fa_per_hour_before'   : fa_before['fa_per_hour'],
         'event_sens_before'    : fa_before['event_sensitivity'],
@@ -250,7 +253,8 @@ for patient_id in patient_ids:
         'sensitivity_merged'   : metrics_merged['sensitivity'],
         'specificity_merged'   : metrics_merged['specificity'],
         'f1_seizure_merged'    : metrics_merged['f1_seizure'],
-        'latency_merged'       : latency_merged,
+        'latency_median_merged': lat_merged['median_sec'],
+        'latency_mean_merged'  : lat_merged['mean_sec'],
         'vec_sens_merged'      : vec_sens_merged,
         'fa_per_hour_merged'   : fa_merged['fa_per_hour'],
         'event_sens_merged'    : fa_merged['event_sensitivity'],
@@ -259,7 +263,8 @@ for patient_id in patient_ids:
         'sensitivity_filtered' : metrics_filtered['sensitivity'],
         'specificity_filtered' : metrics_filtered['specificity'],
         'f1_seizure_filtered'  : metrics_filtered['f1_seizure'],
-        'latency_filtered'     : latency_filtered,
+        'latency_median_filtered': lat_filtered['median_sec'],
+        'latency_mean_filtered': lat_filtered['mean_sec'],
         'vec_sens_filtered'    : vec_sens_filtered,
         'fa_per_hour_filtered' : fa_filtered['fa_per_hour'],
         'event_sens_filtered'  : fa_filtered['event_sensitivity'],

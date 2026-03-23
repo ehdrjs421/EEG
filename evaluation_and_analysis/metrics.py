@@ -9,10 +9,10 @@ def compute_basic_metrics(y_true, y_pred):
     )
 
     return {
-        'accuracy': report['accuracy'],
+        'accuracy'   : report['accuracy'],
         'sensitivity': report['1.0']['recall'],
         'specificity': report['0.0']['recall'],
-        'f1_seizure': report['1.0']['f1-score']
+        'f1_seizure' : report['1.0']['f1-score']
     }
 
 
@@ -24,18 +24,19 @@ def evaluate_vector_based_detection(y_true, y_pred, threshold=0.6):
     detected = 0
     for start, end in events:
         duration = end - start + 1
-        detected_ratio = np.sum(y_pred[start:end+1]) / duration
+        detected_ratio = np.sum(y_pred[start:end + 1]) / duration
         if detected_ratio >= threshold:
             detected += 1
 
     return detected / len(events)
+
 
 # ✨ Early Detection 함수 추가
 def evaluate_early_detection(y_true, y_pred, latency_threshold_sec=30, step_sec=1):
     """
     발작 시작 후 N초 이내에 감지하면 성공으로 판정합니다.
     임상적으로 가장 의미있는 event-wise 지표예요.
- 
+
     Parameters
     ----------
     y_true : np.ndarray
@@ -44,7 +45,7 @@ def evaluate_early_detection(y_true, y_pred, latency_threshold_sec=30, step_sec=
         감지 허용 시간 (초), 기본값 30초
     step_sec : int
         타임스텝당 초
- 
+
     Returns
     -------
     float : 조기 감지율 (0~1)
@@ -52,23 +53,92 @@ def evaluate_early_detection(y_true, y_pred, latency_threshold_sec=30, step_sec=
     events = extract_seizure_events(y_true)
     if not events:
         return None
- 
+
     detected = 0
     for start, end in events:
         window_end = min(start + latency_threshold_sec // step_sec, end)
         if np.sum(y_pred[start:window_end + 1]) > 0:
             detected += 1
- 
+
     return round(detected / len(events), 4)
- 
- 
+
+
+# ✨ 정확한 Event-level Latency 계산
+def compute_detection_latency(y_true, y_pred, step_sec=1):
+    """
+    감지된 발작만 대상으로 이벤트별 latency를 계산합니다.
+    미감지 발작은 제외 — 감지했을 때 얼마나 빠른지가 목적.
+
+    Parameters
+    ----------
+    y_true : np.ndarray
+    y_pred : np.ndarray
+    step_sec : int
+
+    Returns
+    -------
+    dict
+        {
+            'median_sec'  : float,  감지된 발작의 latency 중앙값
+            'mean_sec'    : float,  감지된 발작의 latency 평균
+            'min_sec'     : float,
+            'max_sec'     : float,
+            'n_detected'  : int,    감지된 발작 수
+            'n_total'     : int,    전체 발작 수
+            'latencies'   : list,   발작별 latency 리스트 (분포 분석용)
+        }
+    """
+    true_events = extract_seizure_events(y_true)
+    pred_events = extract_seizure_events(y_pred)
+
+    if not true_events:
+        return {
+            'median_sec': None, 'mean_sec': None,
+            'min_sec': None,    'max_sec': None,
+            'n_detected': 0,    'n_total': 0,
+            'latencies': []
+        }
+
+    latencies = []
+    for t_start, t_end in true_events:
+        # 이 발작 구간과 겹치는 예측 이벤트 중 가장 빨리 시작하는 것
+        in_event_preds = [
+            p_start for p_start, p_end in pred_events
+            if p_start <= t_end and p_end >= t_start
+        ]
+        if in_event_preds:
+            first_detection = min(in_event_preds)
+            # 발작 시작 이전에 감지된 경우 latency = 0으로 처리
+            latency = max(0, (first_detection - t_start) * step_sec)
+            latencies.append(latency)
+
+    if not latencies:
+        return {
+            'median_sec': None, 'mean_sec': None,
+            'min_sec': None,    'max_sec': None,
+            'n_detected': 0,    'n_total': len(true_events),
+            'latencies': []
+        }
+
+    return {
+        'median_sec' : round(float(np.median(latencies)), 2),
+        'mean_sec'   : round(float(np.mean(latencies)), 2),
+        'min_sec'    : round(float(np.min(latencies)), 2),
+        'max_sec'    : round(float(np.max(latencies)), 2),
+        'n_detected' : len(latencies),
+        'n_total'    : len(true_events),
+        'latencies'  : latencies
+    }
+
+
+# ✨ False Alarm 계산 함수 추가
 def compute_false_alarms(y_true, y_pred, recording_hours=None, step_sec=1):
     """
     이벤트 단위 False Alarm을 계산합니다.
- 
+
     False Alarm 정의:
       y_pred 기준 이벤트 중 y_true 발작 구간과 겹치지 않는 이벤트
- 
+
     Parameters
     ----------
     y_true : np.ndarray
@@ -78,7 +148,7 @@ def compute_false_alarms(y_true, y_pred, recording_hours=None, step_sec=1):
         None이면 시퀀스 길이로 자동 계산
     step_sec : int
         타임스텝당 초 (기본값: 1)
- 
+
     Returns
     -------
     dict
@@ -92,13 +162,13 @@ def compute_false_alarms(y_true, y_pred, recording_hours=None, step_sec=1):
     """
     true_events = extract_seizure_events(y_true)
     pred_events = extract_seizure_events(y_pred)
- 
+
     if recording_hours is None:
         recording_hours = len(y_true) * step_sec / 3600
- 
+
     n_fa = 0
     n_tp = 0
- 
+
     for p_start, p_end in pred_events:
         is_tp = False
         for t_start, t_end in true_events:
@@ -110,9 +180,9 @@ def compute_false_alarms(y_true, y_pred, recording_hours=None, step_sec=1):
             n_tp += 1
         else:
             n_fa += 1
- 
+
     fa_per_hour = n_fa / recording_hours if recording_hours > 0 else 0.0
- 
+
     # 이벤트 단위 sensitivity (GT 이벤트 중 감지된 비율)
     detected_true = 0
     for t_start, t_end in true_events:
@@ -121,7 +191,7 @@ def compute_false_alarms(y_true, y_pred, recording_hours=None, step_sec=1):
                 detected_true += 1
                 break
     event_sens = detected_true / len(true_events) if true_events else 0.0
- 
+
     return {
         'n_fa'             : n_fa,
         'n_tp_events'      : n_tp,
