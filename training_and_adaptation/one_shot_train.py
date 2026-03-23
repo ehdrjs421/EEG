@@ -55,6 +55,12 @@ def one_shot_training(
     X_train_scaled = scaler.fit_transform(X_train)
     X_test_scaled  = scaler.transform(X_test)
 
+    n_pos = np.sum(y_train == 1)
+    n_neg = np.sum(y_train == 0)
+    dynamic_pos_weight = float(n_neg / n_pos) if n_pos > 0 else 15.0
+    # 너무 극단적인 값 방지 (5.0 ~ 30.0 범위로 클리핑)
+    dynamic_pos_weight = float(np.clip(dynamic_pos_weight, 5.0, 30.0))
+
     X_train_os, y_train_os = oversample_seizure(
         X_train_scaled, y_train, ratio=3
     )
@@ -112,5 +118,6 @@ def one_shot_training(
         'report'                    : report,
         'chosen_event'              : chosen_event,
         'initial_max_gap'           : initial_max_gap,
-        'initial_context_threshold' : initial_context_threshold,  # ✨
+        'initial_context_threshold' : initial_context_threshold,
+        'dynamic_pos_weight'        : dynamic_pos_weight,  # ✨
     }
