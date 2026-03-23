@@ -54,7 +54,7 @@ np.random.seed(RANDOM_SEED)
 
 # ✨ 덩어리화 공통 파라미터
 MERGE_GAP_RATIO       = 0.5   # 발작 지속시간 대비 max_gap 비율
-MERGE_SCORE_THRESHOLD = 0.0   # gap 구간 score 평균 기준 (SVM 결정 경계)
+MERGE_SCORE_THRESHOLD = -1.0   # gap 구간 score 평균 기준 (SVM 결정 경계)
 STEP_SEC              = 1     # 타임스텝 = 1초 (build_dataset STEP_LEN_SEC 기준)
 FALLBACK_GAP_SEC      = 30    # chosen_event가 없을 때 사용할 기본값
 
