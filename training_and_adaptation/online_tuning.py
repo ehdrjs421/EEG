@@ -14,7 +14,22 @@ def online_tuning(
     max_seizure_samples=30,
     adaptive_min_consec=8
 ):
-    high_conf_idx = np.where(np.abs(decision_scores) > 0.8)[0]
+    MIN_CONSEC_CONF = 3  # 3초 연속 고확신이어야 재학습 데이터로 사용
+ 
+    high_conf_mask = (np.abs(decision_scores) > 0.8).astype(int)
+ 
+    consistent_mask = np.zeros_like(high_conf_mask)
+    count = 0
+    for i in range(len(high_conf_mask)):
+        if high_conf_mask[i] == 1:
+            count += 1
+            if count >= MIN_CONSEC_CONF:
+                # 현재 포함, 앞선 구간도 소급 표시
+                consistent_mask[i - MIN_CONSEC_CONF + 1: i + 1] = 1
+        else:
+            count = 0
+
+    high_conf_idx = np.where(consistent_mask == 1)[0]
     seizure_idx = [i for i in high_conf_idx if y_test[i] == 1]
 
     if len(seizure_idx) > max_seizure_samples:
