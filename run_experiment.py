@@ -99,7 +99,6 @@ for patient_id in patient_ids:
 
     svm             = one_shot['svm']
     scaler          = one_shot['scaler']
-    clip_range      = one_shot['clip_range']        # ✨ RobustScaler 클리핑 범위
     X_train_scaled  = one_shot['X_train_scaled']
     y_train         = one_shot['y_train']
     X_test          = one_shot['X_test']
