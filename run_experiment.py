@@ -107,12 +107,11 @@ for patient_id in patient_ids:
     decision_scores = one_shot['decision_scores']
     chosen_event    = one_shot['chosen_event']
     init_max_gap    = one_shot['initial_max_gap']
-    dynamic_pos_weight = one_shot['dynamic_pos_weight']  # ✨
     context_threshold  = one_shot['initial_context_threshold']
 
     print(f"  chosen_event 지속시간: {(chosen_event[1]-chosen_event[0])*STEP_SEC}초 "
           f"→ init_max_gap={init_max_gap:.1f}s | "
-          f"pos_weight={dynamic_pos_weight:.1f} | "
+        #   f"pos_weight={dynamic_pos_weight:.1f} | "
           f"ctx_threshold={context_threshold['pre_mean_threshold']:.3f}")
 
     # 5. Online Tuning
