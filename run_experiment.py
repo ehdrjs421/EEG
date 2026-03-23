@@ -99,6 +99,7 @@ for patient_id in patient_ids:
 
     svm             = one_shot['svm']
     scaler          = one_shot['scaler']
+    clip_range      = one_shot['clip_range']        # ✨ RobustScaler 클리핑 범위
     X_train_scaled  = one_shot['X_train_scaled']
     y_train         = one_shot['y_train']
     X_test          = one_shot['X_test']
@@ -107,11 +108,12 @@ for patient_id in patient_ids:
     decision_scores = one_shot['decision_scores']
     chosen_event    = one_shot['chosen_event']
     init_max_gap    = one_shot['initial_max_gap']
-    # ✨ one_shot 기반 초기 context threshold
-    context_threshold = one_shot['initial_context_threshold']
+    dynamic_pos_weight = one_shot['dynamic_pos_weight']  # ✨
+    context_threshold  = one_shot['initial_context_threshold']
 
     print(f"  chosen_event 지속시간: {(chosen_event[1]-chosen_event[0])*STEP_SEC}초 "
           f"→ init_max_gap={init_max_gap:.1f}s | "
+          f"pos_weight={dynamic_pos_weight:.1f} | "
           f"ctx_threshold={context_threshold['pre_mean_threshold']:.3f}")
 
     # 5. Online Tuning
@@ -236,47 +238,45 @@ for patient_id in patient_ids:
     # 10. 결과 저장
     results.append({
         'patient'              : patient_id,
-        # before
-        **{f"{k}_before": v for k, v in metrics_before.items()},
+        # before (online tuning 후)
+        'sensitivity_before'   : metrics_before['sensitivity'],
+        'specificity_before'   : metrics_before['specificity'],
+        'f1_seizure_before'    : metrics_before['f1_seizure'],
         'latency_before'       : latency_before,
         'vec_sens_before'      : vec_sens_before,
-        'n_fa_before'          : fa_before['n_fa'],
         'fa_per_hour_before'   : fa_before['fa_per_hour'],
-        'n_true_events'        : fa_before['n_true_events'],
-        'n_pred_events_before' : fa_before['n_pred_events'],
         'event_sens_before'    : fa_before['event_sensitivity'],
         'early30_before'       : early30_before,
-        'early60_before'       : early60_before,
-        # merged
-        **{f"{k}_merged": v for k, v in metrics_merged.items()},
+        # merged (덩어리화 후)
+        'sensitivity_merged'   : metrics_merged['sensitivity'],
+        'specificity_merged'   : metrics_merged['specificity'],
+        'f1_seizure_merged'    : metrics_merged['f1_seizure'],
         'latency_merged'       : latency_merged,
         'vec_sens_merged'      : vec_sens_merged,
-        'n_fa_merged'          : fa_merged['n_fa'],
         'fa_per_hour_merged'   : fa_merged['fa_per_hour'],
-        'n_pred_events_merged' : fa_merged['n_pred_events'],
         'event_sens_merged'    : fa_merged['event_sensitivity'],
         'early30_merged'       : early30_merged,
-        'early60_merged'       : early60_merged,
-        # ✨ filtered
-        **{f"{k}_filtered": v for k, v in metrics_filtered.items()},
-        'latency_filtered'      : latency_filtered,
-        'vec_sens_filtered'     : vec_sens_filtered,
-        'n_fa_filtered'         : fa_filtered['n_fa'],
-        'fa_per_hour_filtered'  : fa_filtered['fa_per_hour'],
-        'n_pred_events_filtered': fa_filtered['n_pred_events'],
-        'event_sens_filtered'   : fa_filtered['event_sensitivity'],
-        'early30_filtered'      : early30_filtered,
-        'early60_filtered'      : early60_filtered,
-        # context threshold
-        'ctx_pre_mean_thr'      : context_threshold['pre_mean_threshold'],
-        'ctx_slope_thr'         : context_threshold['slope_threshold'],
+        # filtered (context filter 후)
+        'sensitivity_filtered' : metrics_filtered['sensitivity'],
+        'specificity_filtered' : metrics_filtered['specificity'],
+        'f1_seizure_filtered'  : metrics_filtered['f1_seizure'],
+        'latency_filtered'     : latency_filtered,
+        'vec_sens_filtered'    : vec_sens_filtered,
+        'fa_per_hour_filtered' : fa_filtered['fa_per_hour'],
+        'event_sens_filtered'  : fa_filtered['event_sensitivity'],
+        'early30_filtered'     : early30_filtered,
+        # 공통
+        'n_true_events'        : fa_before['n_true_events'],
         # 병합 통계
-        'init_max_gap'          : round(init_max_gap, 2),
-        'adaptive_max_gap'      : round(adaptive_max_gap, 2),
-        'n_merges'              : merge_summary['n_merges'],
-        'mean_gap_len_sec'      : merge_summary['mean_gap_len_sec'],
-        'mean_gap_score'        : merge_summary['mean_gap_score'],
-        **resource
+        'init_max_gap'         : round(init_max_gap, 2),
+        'adaptive_max_gap'     : round(adaptive_max_gap, 2),
+        'n_merges'             : merge_summary['n_merges'],
+        # context threshold
+        'ctx_pre_mean_thr'     : context_threshold['pre_mean_threshold'],
+        # 모델 리소스
+        'model_kb'             : resource.get('model_kb'),
+        'pred_time_s'          : resource.get('pred_time_s'),
+        'testset_time_s'       : resource.get('testset_time_s'),
     })
 
     # 10. 메모리 정리

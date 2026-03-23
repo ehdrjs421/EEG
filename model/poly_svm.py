@@ -10,7 +10,8 @@ class PolySVM:
         lr=0.001,
         n_iters=1000,
         loss_weight=False,
-        pos_weight=5.0
+        pos_weight=5.0,
+        lr_decay = 0.0001
     ):
         self.degree = degree
         self.coef0 = coef0
@@ -20,6 +21,7 @@ class PolySVM:
         self.n_iters = n_iters
         self.loss_weight = loss_weight
         self.pos_weight = pos_weight
+        self.lr_decay    = lr_decay 
 
     def _poly_kernel(self, X1, X2):
         return (self.gamma * np.dot(X1, X2.T) + self.coef0) ** self.degree
@@ -34,12 +36,14 @@ class PolySVM:
 
         K = self._poly_kernel(X, X)
 
-        for _ in range(self.n_iters):
+        for epoch in range(self.n_iters):
+            lr_t = self.lr / (1 + self.lr_decay * epoch)
+ 
             for i in range(n_samples):
                 margin = y[i] * np.sum(self.alpha * y * K[:, i])
                 if margin < 1:
                     weight = self.pos_weight if (self.loss_weight and y[i] == 1) else 1.0
-                    self.alpha[i] += self.lr * weight
+                    self.alpha[i] += lr_t * weight  # ✨ lr → lr_t
                 self.alpha[i] = min(self.alpha[i], self.C)
 
     def prune_support_vectors(self, threshold=1e-3):
