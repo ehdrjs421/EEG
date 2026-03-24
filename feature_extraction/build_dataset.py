@@ -8,8 +8,6 @@ import mne
 from feature_extraction.preprocess import load_and_preprocess_edf
 from feature_extraction.tca_fe import extract_tca_features
 
-PRE_ICTAL_SEC = 30
-
 def get_seizure_times(summary_file_path, target_edf_file_name):
     seizures = []
     start_time = None
@@ -48,6 +46,10 @@ N_CHANNELS = len(CHANNELS_TO_USE)
 SUB_BANDS = [(0.5, 4), (4, 8), (8, 12), (12, 16), (16, 20), (20, 24), (24, 28)]
 N_SUBBANDS = len(SUB_BANDS)
 
+# ✨ Seizure Prediction 파라미터 (Gemini 방식)
+SOP_SEC = 30 * 60   # 30분 — Seizure Occurrence Period
+SPH_SEC =  5 * 60   #  5분 — Seizure Prediction Horizon
+
 WINDOW_LEN_SEC = 2  # 2초 윈도우
 STEP_LEN_SEC = 1    # 1초 간격 (핑퐁 전략)
 WINDOW_LEN_SAMPLES = int(WINDOW_LEN_SEC * TARGET_SFREQ)
@@ -75,7 +77,7 @@ def build_dataset(
 
     patient_dirs = sorted(glob.glob(os.path.join(edf_root, "chb*")))
 
-    TARGET_PATIENTS = {'chb01', 'chb02', 'chb03', 'chb04'}
+    TARGET_PATIENTS = {'chb01', 'chb02', 'chb03'}
     patient_dirs = [p for p in sorted(glob.glob(os.path.join(edf_root, "chb*")))
                     if os.path.basename(p) in TARGET_PATIENTS]
 
@@ -149,23 +151,31 @@ def build_dataset(
 
             for k, end_idx in enumerate(end_times):
                 feature_vec_end_time = end_idx * step_len_samples / sfreq
-                feature_vec_start_time = feature_vec_end_time - (
-                    window_len_samples / sfreq
-                )
 
-                is_seizure = False
+                label = 0  # inter-ictal (기본)
                 for seizure_start, seizure_end in seizure_periods:
-                    # ✨ pre-ictal window 적용
-                    # 발작 시작 30초 전부터 발작 종료까지 양성
-                    pre_ictal_start = max(0, seizure_start - PRE_ICTAL_SEC)
-                    overlap_start = max(feature_vec_start_time, pre_ictal_start)
-                    overlap_end   = min(feature_vec_end_time,   seizure_end)
-                    if overlap_start < overlap_end:
-                        is_seizure = True
+                    # pre-ictal 구간: 발작 (SOP+SPH)초 전 ~ SPH초 전
+                    pre_start = seizure_start - SOP_SEC - SPH_SEC
+                    pre_end   = seizure_start - SPH_SEC
+
+                    # ictal + SPH 구간: 제외(-1)
+                    ignore_start = seizure_start - SPH_SEC
+                    ignore_end   = seizure_end
+
+                    if pre_start <= feature_vec_end_time < pre_end:
+                        label = 1   # ✨ pre-ictal → 양성
+                        break
+                    elif ignore_start <= feature_vec_end_time < ignore_end:
+                        label = -1  # ✨ ictal/SPH → 제외
                         break
 
-                if is_seizure:
-                    file_labels[k] = 1
+                file_labels[k] = label
+
+            # ✨ -1 제외 후 유효한 샘플만 사용
+            valid_idx    = np.where(file_labels != -1)[0]
+            features     = features[valid_idx]
+            file_labels  = file_labels[valid_idx]
+            end_times_arr = np.array(end_times)[valid_idx].tolist()
 
             # ===============================
             # Accumulate
