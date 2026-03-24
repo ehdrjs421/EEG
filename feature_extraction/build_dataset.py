@@ -74,6 +74,10 @@ def build_dataset(
 
     patient_dirs = sorted(glob.glob(os.path.join(edf_root, "chb*")))
 
+    TARGET_PATIENTS = {'chb01', 'chb02', 'chb03', 'chb04'}
+    patient_dirs = [p for p in sorted(glob.glob(os.path.join(edf_root, "chb*")))
+                    if os.path.basename(p) in TARGET_PATIENTS]
+
     EXPECTED_FEATURE_SIZE = None
     for patient_dir in patient_dirs:
         patient_id = os.path.basename(patient_dir)
@@ -150,8 +154,11 @@ def build_dataset(
 
                 is_seizure = False
                 for seizure_start, seizure_end in seizure_periods:
-                    overlap_start = max(feature_vec_start_time, seizure_start)
-                    overlap_end = min(feature_vec_end_time, seizure_end)
+                    # ✨ pre-ictal window 적용
+                    # 발작 시작 30초 전부터 발작 종료까지 양성
+                    pre_ictal_start = max(0, seizure_start - PRE_ICTAL_SEC)
+                    overlap_start = max(feature_vec_start_time, pre_ictal_start)
+                    overlap_end   = min(feature_vec_end_time,   seizure_end)
                     if overlap_start < overlap_end:
                         is_seizure = True
                         break
