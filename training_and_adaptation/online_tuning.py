@@ -55,7 +55,7 @@ def online_tuning(
     scores = adaptive_smooth_scores(raw_scores) # ✨ 적응형 스무딩 (30/60/120s)
     y_pred = apply_post_filter(
         (scores > 0.4).astype(int),
-        min_consec=15  # ✨ 8->15초: 예측 모델에 맞게 긴 이벤트만 허용
+        min_consec=10  # ✨ 15->10초: 민감도 복구 조절
     )
 
     return svm, y_pred

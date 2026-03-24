@@ -87,7 +87,7 @@ def one_shot_training(
     raw_scores = svm.decision_function(X_test_scaled)
     decision_scores = adaptive_smooth_scores(raw_scores) # ✨ 적응형 스무딩 (30/60/120s)
     y_pred_raw = (decision_scores > 0.2).astype(int)
-    y_pred     = apply_post_filter(y_pred_raw, min_consec=15)  # ✨ 3->15초: 일시적 노이즈 알람 완벽 제거
+    y_pred     = apply_post_filter(y_pred_raw, min_consec=10)  # ✨ 15->10초: 민감도 복구 조절
 
     # ✨ classification_report는 -1 제외 후 계산
     valid_test_mask = y_test != -1

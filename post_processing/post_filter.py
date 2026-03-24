@@ -43,13 +43,13 @@ def adaptive_smooth_scores(raw_scores, step_sec=1):
     # 2. 미리 3가지 버전의 이동 평균 계산 (벡터화 연산으로 고속 처리)
     m30  = s_raw.rolling(window=30, min_periods=1).mean().values
     m60  = s_raw.rolling(window=60, min_periods=1).mean().values
-    m120 = s_raw.rolling(window=120, min_periods=1).mean().values
+    m90 = s_raw.rolling(window=90, min_periods=1).mean().values
     
     smoothed = np.zeros_like(raw_scores)
     for i in range(len(raw_scores)):
         # 조건 1: 노이즈가 심한(널뛰는) 구간 -> 신중하게 120초 방어
         if volatility[i] > 0.6:
-            smoothed[i] = m120[i]
+            smoothed[i] = m90[i]
         # 조건 2: 매우 안정적이고 명확한 상승(전조) -> 기민하게 30초 반응
         elif raw_scores[i] > 0.6 and volatility[i] < 0.2:
             smoothed[i] = m30[i]
