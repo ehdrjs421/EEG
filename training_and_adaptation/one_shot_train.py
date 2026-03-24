@@ -18,27 +18,20 @@ def one_shot_training(
 ):
     random.seed(random_state)
 
+    # ✨ pre-ictal(1) 기준으로 이벤트 추출 (-1 ictal/SPH 구간은 무시)
     seizure_events = extract_seizure_events(y)
     if not seizure_events:
         return None
 
     chosen_event = random.choice(seizure_events)
     seizure_idx  = list(range(chosen_event[0], chosen_event[1]))
-    nonseizure_idx = df_info[df_info['label'] == 0].index.tolist()
 
-    n_seizure_train = max(1, min(10, int(len(seizure_idx) * 0.5)))
+    # ✨ -1 구간 제외: inter-ictal(0)만 비발작으로 사용
+    nonseizure_idx = [i for i in df_info[df_info['label'] == 0].index.tolist()
+                      if y[i] == 0]
 
-    # ✨ 비발작 샘플 수를 실제 데이터 비율에 맞게 조정
-    # 기존: n_nonseizure = n_seizure * 5 (고정 1:5 비율)
-    # 개선: 실제 전체 데이터 비율을 반영하되 최대 샘플 수 제한
-    #   실제 비율 = 전체 비발작 / 전체 발작
-    #   단, 너무 많으면 학습이 느려지므로 최대 100개로 제한
-    total_seizure  = int(np.sum(y == 1))
-    total_normal   = int(np.sum(y == 0))
-    actual_ratio   = total_normal / total_seizure if total_seizure > 0 else 5.0
-    # 비율 그대로 쓰되 최대 100개 제한 (one_shot 경량 학습 철학 유지)
-    n_nonseizure_train = min(int(n_seizure_train * actual_ratio), 100)
-    n_nonseizure_train = max(n_nonseizure_train, n_seizure_train * 5)  # 최소 5배 보장
+    n_seizure_train    = max(1, min(10, int(len(seizure_idx) * 0.5)))
+    n_nonseizure_train = n_seizure_train * 5
 
     if len(nonseizure_idx) < n_nonseizure_train:
         print("skip")
@@ -67,36 +60,42 @@ def one_shot_training(
     X_test_scaled  = scaler.transform(X_test)
 
     # ✨ pos_weight 설정 — CHB-MIT 실제 불균형 비율 기반
-    # 근거:
-    #   전체 데이터 비발작:발작 비율 = 304.9:1 (CHB-MIT 실측값)
-    #   oversampling(ratio=3)으로 1차 보정 → 남은 불균형 ≈ 100:1
-    #   train 샘플링(5:1)으로 2차 보정   → 남은 불균형 ≈ 20:1
-    #   → pos_weight = 20으로 설정
+    # 전체 비발작:발작 비율 = 304.9:1 (실측)
+    # oversampling(×3) → ≈100:1, train 샘플링(5:1) → ≈20:1
     dynamic_pos_weight = 20.0
 
+    # ✨ train 시 -1 제외 (ictal/SPH 구간 오염 방지)
+    valid_train_mask = y_train != -1
+    X_train_valid    = X_train_scaled[valid_train_mask]
+    y_train_valid    = y_train[valid_train_mask]
+
     X_train_os, y_train_os = oversample_seizure(
-        X_train_scaled, y_train, ratio=3
+        X_train_valid, y_train_valid, ratio=3
     )
 
     svm = PolySVM(
         degree=2, coef0=1, C=10.0, gamma=0.5,
         lr=0.001, n_iters=1000,
         loss_weight=True,
-        pos_weight=dynamic_pos_weight,  # ✨ 동적 할당
+        pos_weight=dynamic_pos_weight,
         lr_decay=0.0001
     )
     svm.fit(X_train_os, y_train_os)
     svm.prune_support_vectors(threshold=1e-3)
 
+    # ✨ 예측은 전체 test 시퀀스 그대로 (타임라인 유지)
     decision_scores = svm.decision_function(X_test_scaled)
     y_pred_raw = (decision_scores > 0.2).astype(int)
     y_pred     = apply_post_filter(y_pred_raw, min_consec=3)
 
+    # ✨ classification_report는 -1 제외 후 계산
+    valid_test_mask = y_test != -1
     report = classification_report(
-        y_test, y_pred, output_dict=True, zero_division=0
+        y_test[valid_test_mask], y_pred[valid_test_mask],
+        output_dict=True, zero_division=0
     )
 
-    # 전체 시퀀스 score 계산 (chosen_event 직전 패턴 추출용)
+    # 전체 시퀀스 score (chosen_event 직전 패턴 추출용)
     all_scores = svm.decision_function(scaler.transform(X))
 
     # one_shot 기반 초기 max_gap
@@ -133,5 +132,5 @@ def one_shot_training(
         'chosen_event'              : chosen_event,
         'initial_max_gap'           : initial_max_gap,
         'initial_context_threshold' : initial_context_threshold,
-        'dynamic_pos_weight'        : dynamic_pos_weight,  # ✨ 분석용
+        'dynamic_pos_weight'        : dynamic_pos_weight,
     }

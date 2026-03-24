@@ -15,6 +15,7 @@ def online_tuning(
     adaptive_min_consec=8,
     max_train_samples=300   # ✨ Forgetting Factor — 최대 train 샘플 수
 ):
+    # ✨ 고확신 pre-ictal(1) 샘플만 재학습에 사용 (-1 제외)
     high_conf_idx = np.where(np.abs(decision_scores) > 0.8)[0]
     seizure_idx   = [i for i in high_conf_idx if y_test[i] == 1]
 
@@ -34,20 +35,23 @@ def online_tuning(
     X_aug = np.vstack([X_train_scaled, X_new])
     y_aug = np.concatenate([y_train, y_new])
 
-    # ✨ Forgetting Factor
-    # SoC 메모리 한계 대응: max_train_samples 초과 시 오래된 데이터 제거
-    # 최신 데이터 우선 유지 (뒤에서부터 max_train_samples개)
+    # ✨ Forgetting Factor — 최신 max_train_samples개만 유지
     if len(X_aug) > max_train_samples:
         X_aug = X_aug[-max_train_samples:]
         y_aug = y_aug[-max_train_samples:]
 
-    X_aug_os, y_aug_os = oversample_seizure(X_aug, y_aug, ratio=3)
+    # ✨ -1 제외 후 학습 (ictal/SPH 오염 방지)
+    valid_mask   = y_aug != -1
+    X_aug_valid  = X_aug[valid_mask]
+    y_aug_valid  = y_aug[valid_mask]
+
+    X_aug_os, y_aug_os = oversample_seizure(X_aug_valid, y_aug_valid, ratio=3)
 
     svm.fit(X_aug_os, y_aug_os)
     svm.prune_support_vectors(threshold=1e-3)
 
+    # ✨ 예측은 전체 시퀀스 그대로 (타임라인 유지)
     scores = svm.decision_function(X_test_scaled)
-
     y_pred = apply_post_filter(
         (scores > 0.4).astype(int),
         min_consec=8

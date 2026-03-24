@@ -172,10 +172,10 @@ def build_dataset(
                 file_labels[k] = label
 
             # ✨ -1 제외 후 유효한 샘플만 사용
-            valid_idx    = np.where(file_labels != -1)[0]
-            features     = features[valid_idx]
-            file_labels  = file_labels[valid_idx]
-            end_times_arr = np.array(end_times)[valid_idx].tolist()
+            # valid_idx    = np.where(file_labels != -1)[0]
+            # features     = features[valid_idx]
+            # file_labels  = file_labels[valid_idx]
+            # end_times_arr = np.array(end_times)[valid_idx].tolist()
 
             # ===============================
             # Accumulate
