@@ -62,15 +62,14 @@ def build_dataset(
     sub_bands = SUB_BANDS,
     window_len_samples =WINDOW_LEN_SAMPLES,
     step_len_samples = STEP_LEN_SAMPLES,
-    context_window_size =CONTEXT_WINDOW_SIZE
+    context_window_size =CONTEXT_WINDOW_SIZE,
+    target_patients=None  # 특정 환자만 지정 (예: ['chb23', 'chb24'])
 ):
     """
     Wrapper of EEG2.py feature + label extraction pipeline.
     Original logic preserved.
     """
 
-    all_patients_features = []
-    all_patients_labels = []
     all_patients_info = []
 
     patient_dirs = sorted(glob.glob(os.path.join(edf_root, "chb*")))
@@ -78,10 +77,11 @@ def build_dataset(
     EXPECTED_FEATURE_SIZE = None
     for patient_dir in patient_dirs:
         patient_id = os.path.basename(patient_dir)
-        # patient_id == 'chb02': ############ 나중에 삭제
-        #    break
-        # if not ('chb13' <= patient_id):
-            # continue
+        
+        # 지정된 환자만 처리 (입력된 경우)
+        if target_patients is not None and patient_id not in target_patients:
+            continue
+            
         # # 데이터 처리 분리 진행
         print(f"{patient_id}")
         summary_file1 = os.path.join(edf_root, f"{patient_id}")
@@ -162,8 +162,6 @@ def build_dataset(
             # ===============================
             # Accumulate
             # ===============================
-            all_patients_features.append(features)
-            all_patients_labels.append(file_labels)
 
             for win_idx in range(len(file_labels)):
                 all_patients_info.append({
@@ -200,11 +198,10 @@ def build_dataset(
         else:
             print(f"⚠️ No data collected for {patient_id}")
 
-    if not all_patients_features:
+    if not all_patients_info:
         raise RuntimeError("No features were extracted from any file.")
 
-    X = np.concatenate(all_patients_features, axis=0)
-    y = np.concatenate(all_patients_labels, axis=0)
+    # 메모리를 많이 차지하는 전체 X, y는 반환하지 않음 (Colab RAM 초과 방지)
     df_info = pd.DataFrame(all_patients_info)
 
-    return X, y, df_info
+    return np.array([]), np.array([]), df_info
