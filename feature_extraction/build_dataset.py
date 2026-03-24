@@ -47,7 +47,7 @@ SUB_BANDS = [(0.5, 4), (4, 8), (8, 12), (12, 16), (16, 20), (20, 24), (24, 28)]
 N_SUBBANDS = len(SUB_BANDS)
 
 # ✨ Seizure Prediction 파라미터 (Gemini 방식)
-SOP_SEC = 30 * 60   # 30분 — Seizure Occurrence Period
+SOP_SEC = 50 * 60   # 30분 — Seizure Occurrence Period
 SPH_SEC =  5 * 60   #  5분 — Seizure Prediction Horizon
 
 WINDOW_LEN_SEC = 2  # 2초 윈도우
