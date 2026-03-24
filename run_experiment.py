@@ -21,6 +21,7 @@ from training_and_adaptation.online_tuning import online_tuning
 # Evaluation & Analysis
 # ===============================
 from evaluation_and_analysis.metrics import compute_basic_metrics, evaluate_vector_based_detection, compute_false_alarms, evaluate_early_detection, compute_detection_latency
+from post_processing.post_filter import smooth_scores
 from evaluation_and_analysis.latency import compute_latency_in_event, compute_latency_per_event
 from evaluation_and_analysis.resource_analysis import analyze_model_resources
 from evaluation_and_analysis.visualization import plot_polysvm_decision_boundary
@@ -128,7 +129,8 @@ for patient_id in patient_ids:
     y_pred = y_pred_after if y_pred_after is not None else y_pred_before
 
     # ✨ 2단계: online tuning 이후 max_gap 갱신
-    final_scores     = svm.decision_function(X_test)
+    raw_final_scores = svm.decision_function(X_test)
+    final_scores     = smooth_scores(raw_final_scores, window_sec=60) # ✨ 일관성을 위해 전체 스무딩 적용
     adaptive_max_gap = estimate_max_gap_from_pred(
         y_pred,
         ratio=MERGE_GAP_RATIO,
