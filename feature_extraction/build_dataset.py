@@ -8,6 +8,7 @@ import mne
 from feature_extraction.preprocess import load_and_preprocess_edf
 from feature_extraction.tca_fe import extract_tca_features
 
+PRE_ICTAL_SEC = 30
 
 def get_seizure_times(summary_file_path, target_edf_file_name):
     seizures = []
