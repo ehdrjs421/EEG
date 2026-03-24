@@ -6,7 +6,7 @@ from sklearn.metrics import classification_report
 from model.poly_svm import PolySVM
 from model.oversampling import oversample_seizure
 from post_processing.event_extraction import extract_seizure_events
-from post_processing.post_filter import apply_post_filter, smooth_scores
+from post_processing.post_filter import apply_post_filter, smooth_scores, adaptive_smooth_scores
 from post_processing.seizure_merge import estimate_max_gap_from_one_shot
 from post_processing.context_filter import compute_context_threshold
 from training_and_adaptation.sampling import stratified_time_sampling
@@ -85,7 +85,7 @@ def one_shot_training(
 
     # ✨ 예측은 전체 test 시퀀스 그대로 (타임라인 유지)
     raw_scores = svm.decision_function(X_test_scaled)
-    decision_scores = smooth_scores(raw_scores, window_sec=60) # ✨ 60초 이동 평균 (FA 억제)
+    decision_scores = adaptive_smooth_scores(raw_scores) # ✨ 적응형 스무딩 (30/60/120s)
     y_pred_raw = (decision_scores > 0.2).astype(int)
     y_pred     = apply_post_filter(y_pred_raw, min_consec=15)  # ✨ 3->15초: 일시적 노이즈 알람 완벽 제거
 
@@ -98,7 +98,7 @@ def one_shot_training(
 
     # 전체 시퀀스 score (chosen_event 직전 패턴 추출용)
     raw_all_scores = svm.decision_function(scaler.transform(X))
-    all_scores     = smooth_scores(raw_all_scores, window_sec=60) # ✨ 스무딩 반영
+    all_scores     = adaptive_smooth_scores(raw_all_scores) # ✨ 스무딩 반영
 
     # one_shot 기반 초기 max_gap
     initial_max_gap = estimate_max_gap_from_one_shot(

@@ -1,7 +1,7 @@
 import random
 import numpy as np
 from model.oversampling import oversample_seizure
-from post_processing.post_filter import apply_post_filter, smooth_scores
+from post_processing.post_filter import apply_post_filter, smooth_scores, adaptive_smooth_scores
 
 
 def online_tuning(
@@ -52,7 +52,7 @@ def online_tuning(
 
     # ✨ 예측은 전체 시퀀스 그대로 (타임라인 유지)
     raw_scores = svm.decision_function(X_test_scaled)
-    scores = smooth_scores(raw_scores, window_sec=60) # ✨ 60초 이동 평균 (FA 억제)
+    scores = adaptive_smooth_scores(raw_scores) # ✨ 적응형 스무딩 (30/60/120s)
     y_pred = apply_post_filter(
         (scores > 0.4).astype(int),
         min_consec=15  # ✨ 8->15초: 예측 모델에 맞게 긴 이벤트만 허용
