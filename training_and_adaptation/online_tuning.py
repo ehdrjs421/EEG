@@ -54,7 +54,7 @@ def online_tuning(
     scores = svm.decision_function(X_test_scaled)
     y_pred = apply_post_filter(
         (scores > 0.4).astype(int),
-        min_consec=8
+        min_consec=15  # ✨ 8->15초: 예측 모델에 맞게 긴 이벤트만 허용
     )
 
     return svm, y_pred

@@ -30,8 +30,8 @@ def one_shot_training(
     nonseizure_idx = [i for i in df_info[df_info['label'] == 0].index.tolist()
                       if y[i] == 0]
 
-    n_seizure_train    = max(1, min(10, int(len(seizure_idx) * 0.5)))
-    n_nonseizure_train = n_seizure_train * 5
+    n_seizure_train    = max(1, min(50, int(len(seizure_idx) * 0.1)))  # ✨ 10->50으로 완화하여 30분 구간 패턴 충분히 학습
+    n_nonseizure_train = n_seizure_train * 10  # ✨ 보다 엄격한 오탐지(FA) 학습을 위해 5배->10배 비율로 증가
 
     if len(nonseizure_idx) < n_nonseizure_train:
         print("skip")
@@ -61,8 +61,8 @@ def one_shot_training(
 
     # ✨ pos_weight 설정 — CHB-MIT 실제 불균형 비율 기반
     # 전체 비발작:발작 비율 = 304.9:1 (실측)
-    # oversampling(×3) → ≈100:1, train 샘플링(5:1) → ≈20:1
-    dynamic_pos_weight = 20.0
+    # oversampling(×3) → ≈100:1, train 샘플링(10:1) → ≈10:1
+    dynamic_pos_weight = 10.0  # ✨ 20->10 감소: 알람 허들을 높여 오탐지(FA) 억제
 
     # ✨ train 시 -1 제외 (ictal/SPH 구간 오염 방지)
     valid_train_mask = y_train != -1
@@ -86,7 +86,7 @@ def one_shot_training(
     # ✨ 예측은 전체 test 시퀀스 그대로 (타임라인 유지)
     decision_scores = svm.decision_function(X_test_scaled)
     y_pred_raw = (decision_scores > 0.2).astype(int)
-    y_pred     = apply_post_filter(y_pred_raw, min_consec=3)
+    y_pred     = apply_post_filter(y_pred_raw, min_consec=15)  # ✨ 3->15초: 일시적 노이즈 알람 완벽 제거
 
     # ✨ classification_report는 -1 제외 후 계산
     valid_test_mask = y_test != -1
@@ -114,7 +114,7 @@ def one_shot_training(
         scores=all_scores,
         tp_event=chosen_event,
         non_seizure_scores=non_seizure_train_scores,
-        context_sec=10,
+        context_sec=60,  # ✨ 10->60초: 전조 증상은 수 분에 걸쳐 서서히 나타남
         step_sec=1
     )
 

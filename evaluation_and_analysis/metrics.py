@@ -79,7 +79,7 @@ def compute_detection_latency(y_true, y_pred, step_sec=1):
         ]
         if in_event_preds:
             first_detection = min(in_event_preds)
-            latency = max(0, (first_detection - t_start) * step_sec)
+            latency = (first_detection - t_start) * step_sec
             latencies.append(latency)
 
     if not latencies:

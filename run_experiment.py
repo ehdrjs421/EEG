@@ -54,7 +54,7 @@ np.random.seed(RANDOM_SEED)
 
 # ✨ 덩어리화 공통 파라미터
 MERGE_GAP_RATIO       = 0.5   # 발작 지속시간 대비 max_gap 비율
-MERGE_SCORE_THRESHOLD = 0.0   # gap 구간 score 평균 기준 (SVM 결정 경계)
+MERGE_SCORE_THRESHOLD = 0.2   # ✨ 0.0->0.2 증가: 낮은 확신의 오탐지끼리 병합되는 현상 방지
 STEP_SEC              = 1     # 타임스텝 = 1초 (build_dataset STEP_LEN_SEC 기준)
 FALLBACK_GAP_SEC      = 30    # chosen_event가 없을 때 사용할 기본값
 
@@ -141,7 +141,7 @@ for patient_id in patient_ids:
         scores=final_scores,
         y_pred=y_pred,
         current_threshold=context_threshold,
-        context_sec=10,
+        context_sec=60,  # ✨ 10->60초: 전조 증상은 수 분에 걸쳐 변화
         step_sec=STEP_SEC,
         high_conf=0.8,
         alpha=0.3
@@ -164,7 +164,7 @@ for patient_id in patient_ids:
         y_pred=y_pred_merged,
         scores=final_scores,
         context_threshold=context_threshold,
-        context_sec=10,
+        context_sec=60,  # ✨ 10->60초
         step_sec=STEP_SEC
     )
     n_filtered = sum(1 for f in filter_log if f['removed'])
