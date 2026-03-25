@@ -46,13 +46,29 @@ def calculate_permutation_importance(patient_id, data_dir, n_repeats=5):
     baseline_f1 = f1_score(y_test_valid, y_pred[valid_mask], zero_division=0)
     print(f"✅ Baseline F1-Score: {baseline_f1:.4f}")
 
-    # 3. 피처 그룹 정의 (TCA-FE + VAR + CA)
-    # TA(0~111), VAR(112~223), CA(224~244)
-    feature_groups = {
-        'TA (Band Power)': list(range(0, 112)),
-        'VAR (Volatility)': list(range(112, 224)),
-        'CA (Cross-Channel)': list(range(224, 245))
-    }
+    # 3. 피처 그룹 정의 (데이터 크기에 따라 자동 조절)
+    n_features = X.shape[1]
+    print(f"📊 감지된 피처 수: {n_features}개")
+
+    if n_features == 357:
+        # 구버전 (SLOPE 포함)
+        feature_groups = {
+            'TA (Band Power)': list(range(0, 112)),
+            'SLOPE (Trend)':  list(range(112, 224)),
+            'VAR (Volatility)': list(range(224, 336)),
+            'CA (Cross-Channel)': list(range(336, 357))
+        }
+    elif n_features == 245:
+        # 신버전 (SLOPE 제거)
+        feature_groups = {
+            'TA (Band Power)': list(range(0, 112)),
+            'VAR (Volatility)': list(range(112, 224)),
+            'CA (Cross-Channel)': list(range(224, 245))
+        }
+    else:
+        # 기타 (범용) — TA라도 분석할 수 있게 기본값 설정
+        print(f"⚠️ 알 수 없는 피처 수입니다. 기본 분석을 시도합니다.")
+        feature_groups = {'Total Features': list(range(n_features))}
 
     importances = {}
 
