@@ -55,7 +55,7 @@ STEP_LEN_SEC = 1    # 1초 간격 (핑퐁 전략)
 WINDOW_LEN_SAMPLES = int(WINDOW_LEN_SEC * TARGET_SFREQ)
 STEP_LEN_SAMPLES = int(STEP_LEN_SEC * TARGET_SFREQ)
 
-CONTEXT_WINDOW_SIZE = 3 # TCA-FE를 위한 컨텍스트 윈도우 (3개의 2초 윈도우)
+CONTEXT_WINDOW_SIZE = 60 # TCA-FE를 위한 컨텍스트 윈도우 (3개의 2초 윈도우)
 
 def build_dataset(
     edf_root,
@@ -77,9 +77,9 @@ def build_dataset(
 
     patient_dirs = sorted(glob.glob(os.path.join(edf_root, "chb*")))
 
-    # TARGET_PATIENTS = {'chb01', 'chb02', 'chb03'}
-    # patient_dirs = [p for p in sorted(glob.glob(os.path.join(edf_root, "chb*")))
-    #                 if os.path.basename(p) in TARGET_PATIENTS]
+    TARGET_PATIENTS = {'chb01', 'chb02', 'chb03'}
+    patient_dirs = [p for p in sorted(glob.glob(os.path.join(edf_root, "chb*")))
+                    if os.path.basename(p) in TARGET_PATIENTS]
 
     EXPECTED_FEATURE_SIZE = None
     for patient_dir in patient_dirs:
