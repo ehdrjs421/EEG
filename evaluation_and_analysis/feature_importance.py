@@ -31,7 +31,7 @@ def calculate_permutation_importance(patient_id, data_dir, n_repeats=5):
         return None
 
     svm = one_shot['svm']
-    X_test_scaled = one_shot['X_test_scaled']
+    X_test_scaled = one_shot['X_test']
     y_test = one_shot['y_test']
     
     # -1 (Ignore/SPH) 제외 마스크
