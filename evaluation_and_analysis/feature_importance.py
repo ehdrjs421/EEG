@@ -56,14 +56,14 @@ def calculate_permutation_importance(patient_id, data_dir, n_repeats=5):
             'TA (Band Power)': list(range(0, 112)),
             'SLOPE (Trend)':  list(range(112, 224)),
             'VAR (Volatility)': list(range(224, 336)),
-            'CA (Cross-Channel)': list(range(336, 357))
+            'CA (Cross-Channel)': list(range(336, n_features))
         }
     elif n_features == 245:
         # 신버전 (SLOPE 제거)
         feature_groups = {
             'TA (Band Power)': list(range(0, 112)),
             'VAR (Volatility)': list(range(112, 224)),
-            'CA (Cross-Channel)': list(range(224, 245))
+            'CA (Cross-Channel)': list(range(224, n_features))
         }
     else:
         # 기타 (범용) — TA라도 분석할 수 있게 기본값 설정
