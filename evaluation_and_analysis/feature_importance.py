@@ -46,13 +46,12 @@ def calculate_permutation_importance(patient_id, data_dir, n_repeats=5):
     baseline_f1 = f1_score(y_test_valid, y_pred[valid_mask], zero_division=0)
     print(f"✅ Baseline F1-Score: {baseline_f1:.4f}")
 
-    # 3. 피처 그룹 정의 (TCA-FE + SLOPE + VAR + CA)
-    # TA(0~111), SLOPE(112~223), VAR(224~335), CA(336~356)
+    # 3. 피처 그룹 정의 (TCA-FE + VAR + CA)
+    # TA(0~111), VAR(112~223), CA(224~244)
     feature_groups = {
         'TA (Band Power)': list(range(0, 112)),
-        'SLOPE (Trend)':  list(range(112, 224)),
-        'VAR (Volatility)': list(range(224, 336)),
-        'CA (Cross-Channel)': list(range(336, 357))
+        'VAR (Volatility)': list(range(112, 224)),
+        'CA (Cross-Channel)': list(range(224, 245))
     }
 
     importances = {}

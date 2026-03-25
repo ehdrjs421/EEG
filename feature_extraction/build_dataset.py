@@ -55,7 +55,7 @@ STEP_LEN_SEC = 1    # 1초 간격 (핑퐁 전략)
 WINDOW_LEN_SAMPLES = int(WINDOW_LEN_SEC * TARGET_SFREQ)
 STEP_LEN_SAMPLES = int(STEP_LEN_SEC * TARGET_SFREQ)
 
-CONTEXT_WINDOW_SIZE = 60 # TCA-FE를 위한 컨텍스트 윈도우 (3개의 2초 윈도우)
+CONTEXT_WINDOW_SIZE = 3 # TCA-FE를 위한 컨텍스트 윈도우 (3개의 2초 윈도우)
 
 def build_dataset(
     edf_root,
