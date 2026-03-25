@@ -77,9 +77,9 @@ def build_dataset(
 
     patient_dirs = sorted(glob.glob(os.path.join(edf_root, "chb*")))
 
-    TARGET_PATIENTS = {'chb01', 'chb02', 'chb03'}
-    patient_dirs = [p for p in sorted(glob.glob(os.path.join(edf_root, "chb*")))
-                    if os.path.basename(p) in TARGET_PATIENTS]
+    # TARGET_PATIENTS = {'chb01', 'chb02', 'chb03'}
+    # patient_dirs = [p for p in sorted(glob.glob(os.path.join(edf_root, "chb*")))
+    #                 if os.path.basename(p) in TARGET_PATIENTS]
 
     EXPECTED_FEATURE_SIZE = None
     for patient_dir in patient_dirs:
