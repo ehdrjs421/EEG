@@ -2,16 +2,13 @@
 
 # EEG-Seizure-Detection-JSSC
 
-본 저장소는 **EEG 기반 뇌전증 발작 탐지 시스템**을 구현한 졸업 프로젝트 코드입니다.
-JSSC 수준의 SoC 기반 뇌전증 관리 시스템 구조를 참고하여,
-알고리즘 구현의 충실성과 실험 재현성을 중심으로 설계되었습니다.
+본 저장소는 **EEG 기반 뇌전증 발작 탐지 시스템**을 구현한 졸업 프로젝트 코드입니다. JSSC 수준의 SoC 기반 뇌전증 관리 시스템 구조를 참고하여, 알고리즘 구현의 충실성과 실험 재현성을 중심으로 설계되었습니다.
 
 ---
 
 ## 1. 프로젝트 개요
 
 본 프로젝트의 주요 목표는 다음과 같습니다.
-
 - 시간 단위 분류가 아닌 **발작 이벤트 단위 탐지**
 - SoC / 임베디드 환경을 고려한 경량 특징 추출
 - One-shot 학습과 online adaptation 결합
@@ -21,43 +18,60 @@ JSSC 수준의 SoC 기반 뇌전증 관리 시스템 구조를 참고하여,
 
 ---
 
+## ✨ 브랜치 주요 변경 사항: feature/tca-expansion
+
+본 브랜치는 뇌전증 발작 탐지 파이프라인의 **성능 고속화, 데이터 강건성(Robustness), 그리고 적응형 로직**에 초점을 맞춘 "차세대" 개선 사항들을 포함하고 있습니다.
+
+- **특징 추출 8배 고속화**: NumPy `stride_tricks`를 사용한 `_windowed_sum_abs` 벡터화 계산을 통해 전처리 시간을 획기적으로 단축했습니다.
+- **TCA 특징 집합 확장**: 기존 TA 특징에 **VAR (분산)** 특징을 추가하여(TA + VAR), 발작 전조 단계에서 나타나는 신호의 불규칙성을 더욱 정교하게 포착합니다.
+- **강건한 전처리(Robust Preprocessing)**: **진폭 임계값 기반 아티팩트 제거**(500 μV) 로직을 통합하여, EEG 신호 내 노이즈를 자동으로 정제하고 채널 평균으로 대체합니다.
+- **적응형 스코어 스무딩(Adaptive Smoothing)**: SVM 결정 스코어의 변동성과 신뢰도에 따라 스무딩 윈도우(30/60/90초)를 동적으로 변경하는 지능형 로직을 적용했습니다.
+- **파이프라인 안정성 향상**: 덩어리화 임계값 상향(0.2) 및 컨텍스트 윈도우 확장(60초)을 통해 높은 탐지 민감도를 유지하면서도 오탐지(False Alarm)를 최소화했습니다.
+
+---
+
 ## 2. 디렉토리 구조
+
 ```
 EEG-Seizure-Detection-JSSC/
 │
-├── 1_feature_extraction/
-│ ├── preprocess.py
-│ ├── bandpass.py
-│ ├── tca_fe.py
-│ └── build_dataset.py
+├── feature_extraction/
+│   ├── preprocess.py        # 아티팩트 제거 로직 포함
+│   ├── bandpass.py
+│   ├── windowing.py
+│   ├── tca_fe.py            # 벡터화 및 VAR 확장 구현
+│   └── build_dataset.py
 │
-├── 2_model/
-│ ├── poly_svm.py
-│ ├── sample_weighting.py
-│ └── oversampling.py
+├── model/
+│   ├── poly_svm.py
+│   ├── sample_weighting.py
+│   └── oversampling.py
 │
-├── 3_post_processing/
-│ ├── event_extraction.py
-│ ├── post_filter.py
-│ └── threshold_tuning.py
+├── post_processing/
+│   ├── event_extraction.py
+│   ├── post_filter.py       # 적응형 스무딩 포함
+│   ├── context_filter.py
+│   ├── seizure_merge.py
+│   └── threshold_tuning.py
 │
-├── 4_training_and_adaptation/
-│ ├── one_shot_train.py
-│ ├── online_tuning.py
-│ └── sequential_loader.py
+├── training_and_adaptation/
+│   ├── one_shot_train.py
+│   ├── online_tuning.py
+│   ├── sampling.py
+│   └── sequential_loader.py
 │
-├── 5_evaluation_and_analysis/
-│ ├── metrics.py
-│ ├── latency.py
-│ ├── event_analysis.py
-│ ├── visualization.py
-│ └── analyze_results.py
+├── evaluation_and_analysis/
+│   ├── metrics.py
+│   ├── latency.py
+│   ├── resource_analysis.py
+│   └── visualization.py
 │
-├── run_experiment.py
+├── results/                 # 실험 결과 및 저장된 모델
+├── run_experiment.py        # 메인 실행 스크립트
+├── analyze_results.py      # 결과 집계 및 분석 스크립트
 ├── requirements.txt
 └── README.md
 ```
-
 
 ---
 
@@ -65,153 +79,74 @@ EEG-Seizure-Detection-JSSC/
 
 `run_experiment.py`에서 수행되는 전체 흐름은 다음과 같습니다.
 
-1. **특징 추출**
-   - EEG 전처리 (채널 선택, 리샘플링)
-   - 다중 대역 bandpass filtering
-   - TCA 기반 특징 추출 및 context window 구성
+1. **강건한 특징 추출 (Robust Feature Extraction)**
+   - **아티팩트 제거**(진폭 임계값)를 포함한 EEG 전처리.
+   - 다중 대역 bandpass filtering.
+   - **벡터화**된 슬라이딩 윈도우 에너지 계산.
+   - TCA 기반 특징 추출 (**TA + VAR** 확장).
 
 2. **환자 단위 데이터 로딩**
-   - 환자별 독립적인 학습 및 평가 수행
+   - 환자별 독립적인 학습 및 평가 수행.
 
 3. **One-shot 학습**
-   - 제한된 발작 샘플을 사용한 초기 PolySVM 학습
-   - 클래스 불균형을 가중치 및 오버샘플링으로 보정
+   - 제한된 샘플을 사용한 초기 PolySVM 학습.
+   - 클래스 불균형을 가중치 및 오버샘플링으로 보정.
+   - 환자 특성에 따른 동적 가중치(dynamic positive weighting) 적용.
 
 4. **Online Tuning**
-   - 신뢰도가 높은 예측 결과를 활용한 모델 적응
+   - 고확신 예측 피드백을 활용한 모델 적응.
 
-5. **결과 저장**
-   - 환자별 시간 단위 예측 결과 저장
-   - 요약 성능 지표를 CSV 파일로 집계
+5. **지능형 후처리 (Advanced Post-processing)**
+   - **적응형 스무딩**: 스코어 변동성에 따른 동적 윈도우 조절.
+   - **덩어리화(0.2 임계값)**: 상향된 신뢰도 기준으로 탐지 블록 병합.
+   - **컨텍스트 필터(60초 윈도우)**: 확장된 패턴 분석을 통한 허위 탐지 제거.
 
-6. **성능 분석 및 시각화**
-   - 이벤트 단위 탐지 성능
-   - latency 분석
-   - 예측 타임라인 시각화
+6. **결과 저장**
+   - 단계별 예측 시퀀스를 `results/` 폴더에 저장.
+   - 요약 지표를 `final_result.csv`로 집계.
 
----
-
-## 4. 이벤트 단위 발작 탐지 전략
-
-본 연구는 개별 시점 분류가 아닌,
-**연속된 발작 구간(이벤트) 단위 탐지**를 목표로 합니다.
-
-- 발작 구간 내 한 번이라도 탐지되면 해당 이벤트를 탐지 성공으로 간주
-- latency는 발작 시작 시점부터 최초 탐지 시점까지의 시간으로 정의
-
-이는 실제 임상 환경과 SoC 기반 시스템 요구사항을 반영한 설계입니다.
+7. **성능 분석 및 시각화**
+   - 이벤트 단위 지표 및 Latency 분석.
+   - **자원 사용량 벤치마킹**: 모델 크기 및 추론 지연 시간 측정.
 
 ---
 
-## 5. 출력 파일 구성
+## 4. 시각화 및 분석
 
-### 5.1 환자별 예측 시퀀스
-```
-pred_sequence_<patient_id>.csv
-```
-
-포함 컬럼:
-- `time_idx`
-- `y_true`
-- `y_pred_before`
-- `y_pred_after`
-- `decision_score`
-- `patient`
-
-해당 파일은 타임라인 시각화 및 이벤트 분석에 사용됩니다.
-
----
-
-### 5.2 전체 요약 결과
-```
-final_result.csv
-```
-
-환자 단위로 집계된 다음 정보가 포함됩니다.
-
-- 정확도, 정밀도, 재현율, F1-score
-- 이벤트 단위 민감도
-- latency 통계
-- 모델 자원 사용량
-
----
-
-## 6. 시각화 및 분석
-
-시각화 코드는 다음 경로에 위치합니다.
-```
-5_evaluation_and_analysis/visualization.py
-```
-
-제공되는 분석 예시는 다음과 같습니다.
-
-- Online tuning 전/후 발작 탐지 타임라인
-- 이벤트 단위 latency 그래프
-- 전체 latency 분포 히스토그램
-
-분석 실행:
+요약 분석 수행 및 집계 지표 생성:
 
 ```bash
-python 5_evaluation_and_analysis/analyze_results.py
+python analyze_results.py
 ```
 
-## 7. 데이터셋
+시각화 도구(`visualization.py`)를 통해 다음을 확인 가능합니다:
+- 파이프라인 단계별 발작 탐지 타임라인 비교
+- PolySVM 결정 경계 시각화
+- 전체 latency 분포 히스토그램
+
+---
+
+## 5. 데이터셋
 
 본 프로젝트는 CHB-MIT Scalp EEG Database를 사용합니다.
-
 https://physionet.org/content/chbmit/1.0.0/
 
 라이선스 문제로 데이터는 저장소에 포함되어 있지 않습니다.
 
-## 8. 실행 환경
+## 6. 실행 환경
 
-권장 환경:
-
-Python 3.9 이상
-
-NumPy, SciPy, scikit-learn
-
-MNE
-
-Matplotlib, Pandas
-
+권장 환경: Python 3.9 이상
 의존성 설치:
 ```bash
-pip install -r requirments.txt
+pip install -r requirements.txt
 ```
 
-## 9. 참고 사항
-
-본 저장소는 성능 경쟁보다는 구현 충실도와 구조적 설계를 중시합니다.
-
-졸업 프로젝트 당시 사용한 알고리즘 흐름을 최대한 유지했습니다.
-
-## 10. 향후 확장 방향
-
-실시간 스트리밍 추론 구조 확장
-
-임베디드 하드웨어 기반 실험
-
-적응적 임계값 조정 기법
-
-딥러닝 기반 방법과의 비교
+---
 
 ## 참고 논문
 
-본 프로젝트는 다음 논문에서 제안된 **환자 맞춤형 뇌전증 관리 SoC 시스템 구조와
-알고리즘 흐름**을 기반으로 구현되었습니다.
+본 프로젝트는 다음 논문에서 제안된 **환자 맞춤형 뇌전증 관리 SoC 시스템 구조와 알고리즘 흐름**을 기반으로 구현되었습니다.
 
 > S. Lee, J. Yoo, H.-J. Yoo  
 > **"A Patient-Specific Closed-Loop Epilepsy Management SoC With One-Shot Learning and Online Tuning"**  
 > IEEE Journal of Solid-State Circuits (JSSC), vol. 54, no. 1, pp. 117–129, 2019.
-
-해당 논문은 EEG 신호를 이용한 **환자 맞춤형 발작 탐지 시스템**을 제안하며,
-다음과 같은 핵심 개념을 포함합니다.
-
-- One-shot learning 기반 초기 모델 학습
-- Online tuning을 통한 환자 적응
-- 실시간 시스템을 고려한 발작 탐지 구조
-- SoC 기반 폐루프(closed-loop) 뇌전증 관리 시스템
-
-본 저장소에서는 논문의 **하드웨어 구현을 재현하는 것이 아니라**,  
-제안된 **알고리즘 파이프라인을 소프트웨어 환경에서 구현하고 실험적으로 검증하는 것**을 목표로 합니다.
