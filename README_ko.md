@@ -22,42 +22,47 @@ JSSC 수준의 SoC 기반 뇌전증 관리 시스템 구조를 참고하여,
 ---
 
 ## 2. 디렉토리 구조
+
 ```
 EEG-Seizure-Detection-JSSC/
 │
-├── 1_feature_extraction/
-│ ├── preprocess.py
-│ ├── bandpass.py
-│ ├── tca_fe.py
-│ └── build_dataset.py
+├── feature_extraction/
+│   ├── preprocess.py
+│   ├── bandpass.py
+│   ├── windowing.py
+│   ├── tca_fe.py
+│   └── build_dataset.py
 │
-├── 2_model/
-│ ├── poly_svm.py
-│ ├── sample_weighting.py
-│ └── oversampling.py
+├── model/
+│   ├── poly_svm.py
+│   ├── sample_weighting.py
+│   └── oversampling.py
 │
-├── 3_post_processing/
-│ ├── event_extraction.py
-│ ├── post_filter.py
-│ └── threshold_tuning.py
+├── post_processing/
+│   ├── event_extraction.py
+│   ├── post_filter.py
+│   ├── context_filter.py
+│   ├── seizure_merge.py
+│   └── threshold_tuning.py
 │
-├── 4_training_and_adaptation/
-│ ├── one_shot_train.py
-│ ├── online_tuning.py
-│ └── sequential_loader.py
+├── training_and_adaptation/
+│   ├── one_shot_train.py
+│   ├── online_tuning.py
+│   ├── sampling.py
+│   └── sequential_loader.py
 │
-├── 5_evaluation_and_analysis/
-│ ├── metrics.py
-│ ├── latency.py
-│ ├── event_analysis.py
-│ ├── visualization.py
-│ └── analyze_results.py
+├── evaluation_and_analysis/
+│   ├── metrics.py
+│   ├── latency.py
+│   ├── resource_analysis.py
+│   └── visualization.py
 │
-├── run_experiment.py
+├── results/                 # 실험 결과 및 저장된 모델
+├── run_experiment.py        # 메인 실행 스크립트
+├── analyze_results.py      # 결과 집계 및 분석 스크립트
 ├── requirements.txt
 └── README.md
 ```
-
 
 ---
 
@@ -68,6 +73,7 @@ EEG-Seizure-Detection-JSSC/
 1. **특징 추출**
    - EEG 전처리 (채널 선택, 리샘플링)
    - 다중 대역 bandpass filtering
+   - 슬라이딩 윈도우 기반 에너지 계산 (`windowing.py`)
    - TCA 기반 특징 추출 및 context window 구성
 
 2. **환자 단위 데이터 로딩**
@@ -76,17 +82,23 @@ EEG-Seizure-Detection-JSSC/
 3. **One-shot 학습**
    - 제한된 발작 샘플을 사용한 초기 PolySVM 학습
    - 클래스 불균형을 가중치 및 오버샘플링으로 보정
+   - 환자 특성에 따른 동적 가중치(dynamic positive weighting) 적용
 
 4. **Online Tuning**
    - 신뢰도가 높은 예측 결과를 활용한 모델 적응
 
-5. **결과 저장**
-   - 환자별 시간 단위 예측 결과 저장
-   - 요약 성능 지표를 CSV 파일로 집계
+5. **후처리 개선 (Post-processing Enhancements)**
+   - **Seizure Merge (덩어리화)**: 적응적 간격을 사용하여 인접한 예측 블록을 하나의 이벤트로 병합.
+   - **Context Filter**: 탐지 이벤트 직전의 신호 패턴을 분석하여 허위 탐지(False Alarm) 제거.
 
-6. **성능 분석 및 시각화**
-   - 이벤트 단위 탐지 성능
-   - latency 분석
+6. **결과 저장**
+   - 환자별 시간 단위 예측 결과 (전/후/병합/필터링) 저장
+   - 학습된 모델 및 임계값 파라미터 `results/` 폴더 내 저장
+
+7. **성능 분석 및 시각화**
+   - 이벤트 단위 탐지 성능 (Sensitivity, FA/h)
+   - Latency 분석 (탐지 지연 시간, 조기 탐지율)
+   - **자원 분석 (Resource Analysis)**: 모델 크기(KB) 및 추론 지연 시간 측정
    - 예측 타임라인 시각화
 
 ---
@@ -96,10 +108,9 @@ EEG-Seizure-Detection-JSSC/
 본 연구는 개별 시점 분류가 아닌,
 **연속된 발작 구간(이벤트) 단위 탐지**를 목표로 합니다.
 
-- 발작 구간 내 한 번이라도 탐지되면 해당 이벤트를 탐지 성공으로 간주
+- 발작 구간 내 예측 시퀀스가 특정 기준(예: vector-based sensitivity)을 만족하면 탐지 성공으로 간주
 - latency는 발작 시작 시점부터 최초 탐지 시점까지의 시간으로 정의
-
-이는 실제 임상 환경과 SoC 기반 시스템 요구사항을 반영한 설계입니다.
+- `seizure_merge` 및 `context_filter` 등의 후처리 도구를 사용하여 탐지 결과를 정제하고 허위 탐지를 줄임
 
 ---
 
@@ -107,53 +118,46 @@ EEG-Seizure-Detection-JSSC/
 
 ### 5.1 환자별 예측 시퀀스
 ```
-pred_sequence_<patient_id>.csv
+results/pred_sequence_<patient_id>.csv
 ```
 
 포함 컬럼:
-- `time_idx`
-- `y_true`
-- `y_pred_before`
-- `y_pred_after`
-- `decision_score`
-- `patient`
-
-해당 파일은 타임라인 시각화 및 이벤트 분석에 사용됩니다.
+- `time_idx`, `y_true`
+- `y_pred_before` (초기/온라인 튜닝 결과)
+- `y_pred_merged` (덩어리화 적용 결과)
+- `y_pred_filtered` (컨텍스트 필터 적용 후 최종 결과)
+- `decision_score`, `patient`
 
 ---
 
 ### 5.2 전체 요약 결과
 ```
-final_result.csv
+results/final_result.csv
 ```
 
 환자 단위로 집계된 다음 정보가 포함됩니다.
 
 - 정확도, 정밀도, 재현율, F1-score
-- 이벤트 단위 민감도
-- latency 통계
-- 모델 자원 사용량
+- 이벤트 단위 민감도, 시간당 허위 탐지율(FA/h)
+- Latency 통계 (평균, 중앙값)
+- 모델 자원 사용량 (모델 크기, 예측 시간)
 
 ---
 
 ## 6. 시각화 및 분석
 
-시각화 코드는 다음 경로에 위치합니다.
-```
-5_evaluation_and_analysis/visualization.py
-```
-
-제공되는 분석 예시는 다음과 같습니다.
-
-- Online tuning 전/후 발작 탐지 타임라인
-- 이벤트 단위 latency 그래프
-- 전체 latency 분포 히스토그램
-
-분석 실행:
+요약 분석을 수행하고 집계된 지표를 생성하려면:
 
 ```bash
-python 5_evaluation_and_analysis/analyze_results.py
+python analyze_results.py
 ```
+
+시각화 도구(`visualization.py`)를 통해 다음을 확인 가능합니다:
+- 파이프라인 단계별 발작 탐지 타임라인 비교
+- PolySVM 결정 경계 시각화
+- 전체 latency 분포 히스토그램
+
+---
 
 ## 7. 데이터셋
 
@@ -165,19 +169,11 @@ https://physionet.org/content/chbmit/1.0.0/
 
 ## 8. 실행 환경
 
-권장 환경:
-
-Python 3.9 이상
-
-NumPy, SciPy, scikit-learn
-
-MNE
-
-Matplotlib, Pandas
+권장 환경: Python 3.9 이상
 
 의존성 설치:
 ```bash
-pip install -r requirments.txt
+pip install -r requirements.txt
 ```
 
 ## 9. 참고 사항
